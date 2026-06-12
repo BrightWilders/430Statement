@@ -1,371 +1,358 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GL Entry Tool</title>
-  <style>
-    :root{
-      --bg:#f7f9fc; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --border:#e2e8f0; --accent:#2563eb;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;padding:24px;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    h1{margin:0 0 6px;font-size:22px}
-    .sub{color:var(--muted);margin-bottom:16px}
-    .wrap{display:grid;grid-template-columns:1.2fr 2fr;gap:16px;align-items:start}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(2,6,23,.04)}
-    .controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-    button,select,input[type="text"],input[type="month"]{border:1px solid var(--border);background:#fff;color:var(--ink);padding:8px 10px;border-radius:10px;font-size:13px}
-    button:hover{border-color:var(--accent)}
-    .row{display:grid;grid-template-columns:180px 1fr 0.8fr;gap:8px;align-items:start}
-    .row+.row{margin-top:8px}
-    .pill{font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted);background:#fff}
-    .total{font-weight:700;font-size:16px}
-    .amount{width:100%;text-align:right}
-    .descInput{width:100%}
-    .grid{display:grid;gap:10px}
-    .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .right{margin-left:auto}
-    .small{font-size:12px}
-    .divider{height:1px;background:var(--border);margin:8px 0}
-    .stickyFooter{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--border);padding:8px;border-radius:0 0 14px 14px;display:flex;gap:10px;align-items:center}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-    .note{color:var(--muted);font-size:12px}
-    .search{width:100%}
-    .computed{background:#f1f5f9}
-    .copyWrap{display:flex;gap:8px;align-items:center}
-    .copyBtn{cursor:pointer}
-    .readonly{background:#f8fafc}
-  </style>
+<meta charset="UTF-8">
+<title>Owner Statement Airbase Tool</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f6f4ef;margin:0;padding:30px;color:#2f2f2f}
+.container{max-width:1350px;margin:auto;background:white;padding:30px;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+h1{margin-top:0}
+label{font-weight:bold;display:block;margin-top:12px}
+input,select{width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
+table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
+th{background:#3b2f2f;color:white;padding:9px;text-align:left}
+td{border:1px solid #ddd;padding:7px}
+button{border:none;border-radius:8px;padding:10px 14px;margin-top:15px;cursor:pointer;font-weight:bold}
+.btn-main{background:#6f4e37;color:white}
+.btn-green{background:#4f7d57;color:white}
+.btn-red{background:#b54b4b;color:white}
+.btn-copy{background:#4d5f7a;color:white}
+.summary{margin-top:20px;padding:15px;background:#eef3ea;border-radius:10px;font-weight:bold}
+.fixed-box{background:#f1eadf;padding:15px;border-radius:10px;margin-bottom:20px;font-size:14px}
+.customGL{display:none}
+.check-box{margin-top:25px;padding:18px;background:#f7f7f7;border-radius:10px;border:1px solid #ddd}
+.good{color:#2f7d32;font-weight:bold}
+.bad{color:#b00020;font-weight:bold}
+</style>
 </head>
+
 <body>
-  <header class="card">
-    <h1>GL Entry Tool</h1>
-    <div class="sub">
-      GLs and base descriptions are hard-coded from your sheet. Lines with a colon <span class="mono">:</span> allow a memo. 
-      The <b>Total</b> auto-sums the four top items and cannot be edited. Right-side figures show as positive.
-    </div>
-    <div class="controls">
-      <input id="period" type="month" />
-      <button id="newPeriod">Start Period</button>
-      <button id="save">Save</button>
-      <button id="exportCsv">Export CSV</button>
-      <button id="exportJson">Export JSON</button>
-      <label class="pill"><input id="showZero" type="checkbox" checked> Show zero rows</label>
-      <input id="q" class="search" placeholder="Search GL or description…" />
-    </div>
-    <div class="divider"></div>
-    <div class="copyWrap">
-      <div class="pill">Airbase Description</div>
-      <input id="airbaseDesc" class="descInput mono readonly" type="text" readonly />
-      <button id="copyDesc" class="copyBtn">Copy</button>
-    </div>
-  </header>
+<div class="container">
+<h1>Owner Statement Airbase Tool</h1>
 
-  <main class="wrap">
-    <section class="card">
-      <div class="flex">
-        <div class="pill">GL Count: <span id="glCount"></span></div>
-        <div class="pill">Memo-enabled: <span id="memoCount"></span></div>
-        <div class="right total">Total: <span id="grandTotal" class="mono">$0.00</span></div>
-      </div>
-      <div class="divider"></div>
-      <div id="rows" class="grid"></div>
-      <div class="stickyFooter">
-        <div class="total">Total: <span id="grandTotal2" class="mono">$0.00</span></div>
-        <div class="right note">Tip: Enter formats on blur/Enter. Switch the month to keep period-specific values.</div>
-      </div>
-    </section>
+<div class="fixed-box">
+<strong>Fixed Coding:</strong><br>
+Category: 1740-0303--Investment in sub - Kress Penthouse - Brightwild<br>
+Class: 430 Fleming<br>
+Department: Prop Service G&A
+</div>
 
-    <aside class="card">
-      <h3 style="margin-top:0">Summary</h3>
-      <div id="summary"></div>
-    </aside>
-  </main>
+<label>Statement Month</label>
+<select id="month">
+<option>January</option><option>February</option><option>March</option><option selected>April</option>
+<option>May</option><option>June</option><option>July</option><option>August</option>
+<option>September</option><option>October</option><option>November</option><option>December</option>
+</select>
 
-  <script>
-    /* ==== DATA FROM YOUR SHEET (unchanged) ==== */
-    const SEED = {data: {records: [
-      {"gl": "Total Revenue", "base": "", "allowMemo": false},
-      {"gl": "Management Fee & platform fee", "base": "", "allowMemo": false},
-      {"gl": "Housekeeping & Supplies Fees", "base": "", "allowMemo": false},
-      {"gl": "OTA & host fees", "base": "", "allowMemo": false},
-      {"gl": "Total", "base": "Invoice Total (auto-summed from the four lines below)", "allowMemo": false},
-      {"gl": "Rent & Lease Expense", "base": "", "allowMemo": false},
-      {"gl": "Rent & Lease Expense - 20%", "base": "", "allowMemo": false},
-      {"gl": "Commercial Rent - Sales Tax", "base": "", "allowMemo": false},
-      {"gl": "Commercial Rent - Sales Tax - 20%", "base": "", "allowMemo": false},
-      {"gl": "Sales Tax Credit", "base": "", "allowMemo": false},
-      {"gl": "Facilities Management Program Charge", "base": "", "allowMemo": false},
-      {"gl": "CAM Expense", "base": "", "allowMemo": false},
-      {"gl": "CAM Expense- 20%", "base": "", "allowMemo": false},
-      {"gl": "Common Area Maintenance", "base": "", "allowMemo": false},
-      {"gl": "Fees - Linens & Soft Goods", "base": "", "allowMemo": false},
-      {"gl": "Laundry - Linens & Soft Goods", "base": "", "allowMemo": false},
-      {"gl": "Fees - Household", "base": "", "allowMemo": false},
-      {"gl": "Laundry - Household", "base": "", "allowMemo": false},
-      {"gl": "FYI", "base": "", "allowMemo": false},
-      {"gl": "Janitorial Supplies & Tools", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Electrical", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Furniture Repair", "base": "", "allowMemo": false},
-      {"gl": "Gas - Propane", "base": "", "allowMemo": false},
-      {"gl": "Pool & Spa care", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Plumbing", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Building Reactive", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Permits", "base": "", "allowMemo": false},
-      {"gl": "Unit Items & Small Appliances", "base": "", "allowMemo": false},
-      {"gl": "Seasonal Decor and Supplies", "base": "", "allowMemo": false},
-      {"gl": "FM: Team Events", "base": "", "allowMemo": false},
-      {"gl": "Owner Collections/Payments in", "base": "", "allowMemo": false},
-      {"gl": "Unit Supplies", "base": "", "allowMemo": false},
-      {"gl": "Reactive Supplies - Electrical", "base": "", "allowMemo": false},
-      {"gl": "Reactive Supplies - Grounds", "base": "", "allowMemo": false},
-      {"gl": "Photography & Staging Expenses", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - HVAC - Reactive", "base": "", "allowMemo": false},
-      {"gl": "Guest Relations", "base": "", "allowMemo": false},
-      {"gl": "Reactive Supplies - Plumbing", "base": "", "allowMemo": false},
-      {"gl": "Owner Stay Expense", "base": "", "allowMemo": false},
-      {"gl": "CAPEX", "base": "", "allowMemo": false},
-      {"gl": "Reactive Supplies - Other", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Signage", "base": "", "allowMemo": false},
-      {"gl": "Reactive Supplies - HVAC", "base": "", "allowMemo": false},
-      {"gl": "Broker Fee", "base": "", "allowMemo": false},
-      {"gl": "Outside Services - Building", "base": "", "allowMemo": false}
-    ]}};
+<label>Statement Year</label>
+<input id="year" type="number" value="2026">
 
-    /* ==== CONSTANTS ==== */
-    const COMPONENT_GLS = [
-      "Total Revenue",
-      "Management Fee & platform fee",
-      "Housekeeping & Supplies Fees",
-      "OTA & host fees"
-    ];
-    const TOTAL_GL_NAME = "Total";
+<label>Expected Statement Amount</label>
+<input id="expectedAmount" type="number" step="0.01" placeholder="Enter amount from statement" oninput="generateOutput()">
 
-    /* ==== HELPERS ==== */
-    const $ = sel => document.querySelector(sel);
-    const fmt = n => (isNaN(n)?0:n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    const parseAmt = v => { if (!v) return 0; v = String(v).replace(/[,\\s\\$]/g,""); return parseFloat(v)||0; };
-    const key = p => `gltool:${p}`;
-    const load = p => { try { return JSON.parse(localStorage.getItem(key(p)))||{} } catch { return {} } };
-    const save = (p,m) => localStorage.setItem(key(p), JSON.stringify(m));
-    const csvEscape = s => { s=String(s); return /[",\\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; };
+<table>
+<thead>
+<tr>
+<th style="width:28%">GL</th>
+<th style="width:24%">Custom GL if needed</th>
+<th style="width:33%">Memo Detail</th>
+<th style="width:10%">Amount</th>
+<th style="width:5%">Remove</th>
+</tr>
+</thead>
+<tbody id="lines"></tbody>
+</table>
 
-    // Use fixed description if present; else GL
-    function displayLabelForKey(k){
-      const [gl, base] = k.split("||");
-      return (base && base.trim()) ? base.trim() : gl;
-    }
-    // Normalize variants like "- 20%" for grouping
-    function normalizeLabel(label){
-      let s = (label || "").trim().replace(/[—–]/g, "-");
-      s = s.replace(/\s*-\s*20%\s*$/i, ""); // drop trailing "- 20%"
-      s = s.replace(/\s+/g, " ").trim();
-      return s;
-    }
+<button class="btn-main" onclick="addRow()">+ Add Line</button>
+<button class="btn-green" onclick="generateOutput()">Generate Airbase Pivot</button>
+<button class="btn-copy" onclick="saveCustomGLs()">Save Custom GLs</button>
 
-    /* ==== STATE ==== */
-    let period = new Date().toISOString().slice(0,7);
-    let filter = "";
-    const base = SEED.data.records;
-    const rowsDiv = $("#rows");
+<div class="summary" id="totalBox">Total Entered: $0.00</div>
 
-    /* ==== CORE LOGIC ==== */
-    function findRecKeyByGL(glName){
-      const r = base.find(b => b.gl === glName);
-      return r ? (r.gl + "||" + r.base) : null;
-    }
-    function computeComponentAmounts(store){
-      const result = [];
-      COMPONENT_GLS.forEach(gl => {
-        const k = findRecKeyByGL(gl);
-        const amt = k && store[k] ? parseAmt(store[k].amount) : 0;
-        result.push({gl, amount: amt});
-      });
-      return result;
-    }
-    function computeAirbaseDescription(store){
-      const parts = computeComponentAmounts(store).map(x => `${x.gl} (${fmt(Math.abs(x.amount))})`);
-      return parts.join(", ");
-    }
-    function computeTotalFromComponents(store){
-      return computeComponentAmounts(store).reduce((a,b)=>a+b.amount,0);
-    }
+<div class="check-box">
+<h2>Control Check</h2>
+<table>
+<tbody>
+<tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
+<tr><td><strong>Total Expenses</strong></td><td id="totalExpenses">$0.00</td></tr>
+<tr><td><strong>Calculated Statement Amount</strong></td><td id="calculatedStatement">$0.00</td></tr>
+<tr><td><strong>Expected Statement Amount</strong></td><td id="expectedDisplay">$0.00</td></tr>
+<tr><td><strong>Difference</strong></td><td id="differenceDisplay">$0.00</td></tr>
+</tbody>
+</table>
+</div>
 
-    /* ==== RENDER ==== */
-    function render(){
-      $("#period").value = period;
-      const store = load(period);
-      rowsDiv.innerHTML = "";
+<h2>Airbase Pivot Output</h2>
 
-      const items = base.filter(r => !filter || (r.gl + " " + r.base).toLowerCase().includes(filter));
+<table id="outputTable">
+<thead>
+<tr>
+<th style="width:8%">Line</th>
+<th style="width:72%">Airbase Memo</th>
+<th style="width:20%">SUM of Invoice S/B</th>
+</tr>
+</thead>
+<tbody id="outputBody"></tbody>
+</table>
 
-      items.forEach(r => {
-        const recKey = r.gl + "||" + r.base;
-        const isTotalRow = (r.gl === TOTAL_GL_NAME);
-        const existing = store[recKey] || { memo: "", amount: 0 };
+<button class="btn-copy" onclick="copyTable()">Copy Pivot Table</button>
+</div>
 
-        const row = document.createElement("div");
-        row.className = "row" + (isTotalRow ? " computed" : "");
-        row.dataset.key = recKey;
+<script>
+const SPECIAL_GROUPS = [
+  "Total Revenue",
+  "Management Fee & platform fee",
+  "Housekeeping & Supplies Fees",
+  "OTA & host fees"
+];
 
-        const gl = document.createElement("div");
-        gl.className = "mono";
-        gl.textContent = r.gl;
+let BASE_GL_LIST = [
+  "Total Revenue",
+  "Management Fee & platform fee",
+  "Housekeeping & Supplies Fees",
+  "OTA & host fees",
+  "Rent & Lease Expense",
+  "Facilities Management Program Charge",
+  "Common Area Maintenance",
+  "Utilities - Electric",
+  "Utilities - Water",
+  "Monthly Brand Design Services",
+  "Website Services",
+  "Monthly Social Media Services",
+  "Reactive Labor - Maintenance",
+  "Reactive Supplies - Grounds",
+  "CAPEX"
+];
 
-        const descWrap = document.createElement("div");
-        const descTop = document.createElement("div");
-        const baseSpan = document.createElement("span");
-        baseSpan.textContent = r.base || (isTotalRow ? "Total (auto-calculated)" : "");
-        descTop.appendChild(baseSpan);
-        if (r.allowMemo && !isTotalRow) {
-          const memoBadge = document.createElement("span");
-          memoBadge.className = "pill";
-          memoBadge.style.marginLeft = "8px";
-          memoBadge.textContent = "memo";
-          descTop.appendChild(memoBadge);
-        }
-        descWrap.appendChild(descTop);
+function getSavedGLs(){
+  return JSON.parse(localStorage.getItem("ownerStatementCustomGLs") || "[]");
+}
 
-        const amountInput = document.createElement("input");
-        amountInput.type = "text";
-        amountInput.inputMode = "decimal";
-        amountInput.className = "amount mono";
+function getGLList(){
+  return [...new Set([...BASE_GL_LIST, ...getSavedGLs()])];
+}
 
-        if (isTotalRow){
-          amountInput.readOnly = true;
-          amountInput.classList.add("readonly");
-          const setComputed = () => {
-            const s = load(period);
-            amountInput.value = fmt(Math.abs(computeTotalFromComponents(s)));
-            updateHeaderAndSummary();
-          };
-          setComputed();
-        } else {
-          amountInput.value = existing.amount || "";
-          amountInput.placeholder = "0.00";
-          const normalize = () => {
-            const s = load(period);
-            const rec = s[recKey] || {};
-            const n = parseAmt(amountInput.value);
-            rec.amount = n;
-            s[recKey] = rec;
-            save(period, s);
-            amountInput.value = n ? fmt(n) : "";
-            updateHeaderAndSummary();
-            render(); // refresh computed total display
-          };
-          amountInput.addEventListener("blur", normalize);
-          amountInput.addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); normalize(); }});
-        }
+function addRow(gl="", memo="", amount=""){
+  const tbody = document.getElementById("lines");
+  const row = document.createElement("tr");
 
-        row.appendChild(gl);
-        row.appendChild(descWrap);
-        row.appendChild(amountInput);
-        rowsDiv.appendChild(row);
-      });
+  const options = getGLList().map(g =>
+    `<option ${g===gl ? "selected" : ""}>${g}</option>`
+  ).join("");
 
-      updateHeaderAndSummary();
-      toggleZeroRows();
-    }
+  row.innerHTML = `
+    <td>
+      <select class="gl" onchange="toggleCustomGL(this); generateOutput();">
+        ${options}
+        <option value="__CUSTOM__">+ Add New GL</option>
+      </select>
+    </td>
+    <td><input class="customGL" placeholder="Type new GL name" oninput="generateOutput()"></td>
+    <td><input class="memo" value="${memo}" placeholder="Example: Stepping stones" oninput="generateOutput()"></td>
+    <td><input class="amount" type="number" step="0.01" value="${amount}" oninput="generateOutput()"></td>
+    <td><button class="btn-red" onclick="removeRow(this)">X</button></td>
+  `;
 
-    /* ==== HEADER & SUMMARY ==== */
-    function updateHeaderAndSummary(){
-      const s = load(period);
+  tbody.appendChild(row);
+  generateOutput();
+}
 
-      // Header grand totals show positive Airbase sum
-      const compTotal = computeTotalFromComponents(s);
-      const display = fmt(Math.abs(compTotal));
-      document.getElementById("grandTotal").textContent = "$" + display;
-      document.getElementById("grandTotal2").textContent = "$" + display;
+function toggleCustomGL(select){
+  const row = select.closest("tr");
+  const customInput = row.querySelector(".customGL");
 
-      // Airbase line (for copy box)
-      const airbaseLine = computeAirbaseDescription(s);
-      document.getElementById("airbaseDesc").value = airbaseLine;
+  if(select.value === "__CUSTOM__"){
+    customInput.style.display = "block";
+    customInput.focus();
+  } else {
+    customInput.style.display = "none";
+    customInput.value = "";
+  }
+}
 
-      // Category rollups (use fixed description; merge "- 20%" into base label)
-      const agg = new Map();
-      Object.entries(s).forEach(([k,v])=>{
-        const [gl] = k.split("||");
-        if (gl === TOTAL_GL_NAME) return;
-        const amt = parseAmt(v.amount);
-        if (!amt) return;
-        const label = normalizeLabel(displayLabelForKey(k));
-        const cur = agg.get(label) || 0;
-        agg.set(label, cur + amt);
-      });
+function removeRow(btn){
+  btn.closest("tr").remove();
+  generateOutput();
+}
 
-      // Build summary HTML:
-      let html = "";
-      html += `<div class="total">Total (Airbase): <span class="mono">$${display}</span></div>`;
-      html += `<div class="small" style="color:var(--muted);margin:6px 0 10px 0">${airbaseLine || "—"}</div>`;
-      if (agg.size){
-        html += `<div class="divider"></div><div class="pill">Category totals</div>`;
-        const rows = Array.from(agg.entries())
-          .sort((a,b)=>Math.abs(b[1]) - Math.abs(a[1])) // largest first
-          .map(([label,sum]) => `<div class="flex small"><div>${label}</div><div class="right mono">$${fmt(Math.abs(sum))}</div></div>`)
-          .join("");
-        html += rows;
-      } else {
-        html += `<div style="color:var(--muted)">No category totals yet.</div>`;
-      }
-      document.getElementById("summary").innerHTML = html;
-    }
+function getRows(){
+  return [...document.querySelectorAll("#lines tr")].map(row => {
+    const glSelect = row.querySelector(".gl").value.trim();
+    const customGL = row.querySelector(".customGL").value.trim();
 
-    function toggleZeroRows(){
-      const show = document.getElementById("showZero").checked;
-      const s = load(period);
-      document.querySelectorAll("#rows .row").forEach(row => {
-        const rec = s[row.dataset.key] || {};
-        const amt = parseAmt(rec.amount);
-        const isTotal = row.dataset.key.startsWith("Total||");
-        row.style.display = (show || amt || isTotal) ? "grid" : "none";
-      });
-    }
+    return {
+      gl: glSelect === "__CUSTOM__" ? customGL : glSelect,
+      memo: row.querySelector(".memo").value.trim(),
+      amount: parseFloat(row.querySelector(".amount").value) || 0
+    };
+  }).filter(r => r.gl || r.memo || r.amount !== 0);
+}
 
-    /* ==== EVENTS ==== */
-    document.getElementById("period").addEventListener("change", e => { period = e.target.value || period; render(); });
-    document.getElementById("newPeriod").addEventListener("click", () => {
-      const p = document.getElementById("period").value; if (!p) return;
-      period = p;
-      const tmpl = {};
-      SEED.data.records.forEach(r => { tmpl[r.gl + "||" + r.base] = { memo:"", amount:0 }; });
-      save(period, tmpl);
-      render();
+function saveCustomGLs(){
+  const currentSaved = getSavedGLs();
+  const newGLs = getRows()
+    .map(r => r.gl)
+    .filter(gl => gl && !BASE_GL_LIST.includes(gl) && !currentSaved.includes(gl));
+
+  const updated = [...new Set([...currentSaved, ...newGLs])];
+  localStorage.setItem("ownerStatementCustomGLs", JSON.stringify(updated));
+
+  alert("Custom GLs saved. They will show in the dropdown next time.");
+}
+
+function money(num){
+  return Math.abs(num).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatAmount(num){
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCurrency(num){
+  return num.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD"
+  });
+}
+
+function generateOutput(){
+  const rows = getRows();
+  const outputBody = document.getElementById("outputBody");
+  outputBody.innerHTML = "";
+
+  let outputRows = [];
+
+  const specialRows = rows.filter(r => SPECIAL_GROUPS.includes(r.gl));
+  const normalRows = rows.filter(r => !SPECIAL_GROUPS.includes(r.gl));
+
+  const totalEntered = rows.reduce((sum, r) => sum + r.amount, 0);
+  document.getElementById("totalBox").innerText = `Total Entered: ${formatCurrency(totalEntered)}`;
+
+  const netRevenue = specialRows.reduce((sum, r) => sum + r.amount, 0);
+  const totalExpenses = normalRows.reduce((sum, r) => sum + r.amount, 0);
+  const calculatedStatementAmount = totalExpenses - netRevenue;
+
+  const expectedAmount = parseFloat(document.getElementById("expectedAmount").value) || 0;
+  const difference = calculatedStatementAmount - expectedAmount;
+
+  document.getElementById("netRevenue").innerText = formatCurrency(netRevenue);
+  document.getElementById("totalExpenses").innerText = formatCurrency(totalExpenses);
+  document.getElementById("calculatedStatement").innerText = formatCurrency(calculatedStatementAmount);
+  document.getElementById("expectedDisplay").innerText = formatCurrency(expectedAmount);
+
+  const differenceCell = document.getElementById("differenceDisplay");
+  differenceCell.innerText = formatCurrency(difference);
+
+  if(Math.abs(difference) < 0.01){
+    differenceCell.className = "good";
+    differenceCell.innerText += " ✅";
+  } else {
+    differenceCell.className = "bad";
+    differenceCell.innerText += " ❌";
+  }
+
+  if(specialRows.length){
+    const memo = SPECIAL_GROUPS.map(gl => {
+      const found = specialRows.find(r => r.gl === gl);
+      return found ? `${gl} (${money(found.amount)})` : null;
+    }).filter(Boolean).join(", ");
+
+    const airbaseAmount = netRevenue * -1;
+
+    outputRows.push({
+      memo: memo,
+      amount: airbaseAmount
     });
-    document.getElementById("save").addEventListener("click", () => { save(period, load(period)); alert("Saved for period " + period); });
-    document.getElementById("exportCsv").addEventListener("click", () => {
-      const s = load(period);
-      // Export Total as displayed (positive)
-      const totalKey = findRecKeyByGL("Total");
-      if (totalKey) { s[totalKey] = {memo:"", amount: Math.abs(computeTotalFromComponents(s))}; }
-      const rows = [["Period","GL","Description","Amount"]];
-      Object.entries(s).forEach(([k,v]) => {
-        const [gl, base] = k.split("||");
-        rows.push([period, gl, base + (v.memo?": "+v.memo:""), parseAmt(v.amount)])
-      });
-      const csv = rows.map(r => r.map(csvEscape).join(",")).join("\\n");
-      const blob = new Blob([csv], {type:"text/csv"});
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `gl-entries-${period}.csv`; a.click();
-    });
-    document.getElementById("exportJson").addEventListener("click", () => {
-      const s = load(period);
-      const totalKey = findRecKeyByGL("Total");
-      if (totalKey) { s[totalKey] = {memo:"", amount: Math.abs(computeTotalFromComponents(s))}; }
-      const blob = new Blob([JSON.stringify({period, entries: s}, null, 2)], {type:"application/json"});
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `gl-entries-${period}.json`; a.click();
-    });
-    document.getElementById("showZero").addEventListener("change", toggleZeroRows);
-    document.getElementById("q").addEventListener("input", e => { filter = (e.target.value || "").toLowerCase(); render(); });
-    document.getElementById("copyDesc").addEventListener("click", async () => {
-      const v = document.getElementById("airbaseDesc").value;
-      try { await navigator.clipboard.writeText(v); alert("Airbase description copied!"); } catch { 
-        document.getElementById("airbaseDesc").select(); document.execCommand("copy"); alert("Copied."); 
-      }
-    });
+  }
 
-    // Kick off
-    render();
-  </script>
+  const grouped = {};
+
+  normalRows.forEach(r => {
+    if(!grouped[r.gl]){
+      grouped[r.gl] = {
+        gl: r.gl,
+        memos: [],
+        amount: 0
+      };
+    }
+
+    if(r.memo){
+      grouped[r.gl].memos.push(r.memo);
+    }
+
+    grouped[r.gl].amount += r.amount;
+  });
+
+  Object.values(grouped).forEach(group => {
+    let memoText = group.gl;
+
+    if(group.memos.length){
+      memoText = `${group.gl} : ${group.memos.join(", ")}`;
+    }
+
+    outputRows.push({
+      memo: memoText,
+      amount: group.amount
+    });
+  });
+
+  outputRows.forEach((row, index) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${row.memo}</td>
+      <td>${formatAmount(row.amount)}</td>
+    `;
+    outputBody.appendChild(tr);
+  });
+
+  const grandTotal = outputRows.reduce((sum, r) => sum + r.amount, 0);
+
+  const totalRow = document.createElement("tr");
+  totalRow.innerHTML = `
+    <td></td>
+    <td><strong>Grand Total</strong></td>
+    <td><strong>${formatAmount(grandTotal)}</strong></td>
+  `;
+  outputBody.appendChild(totalRow);
+}
+
+function copyTable(){
+  let text = "Line\tAirbase Memo\tSUM of Invoice S/B\n";
+
+  [...document.querySelectorAll("#outputBody tr")].forEach(row => {
+    const cells = [...row.querySelectorAll("td")].map(td => td.innerText);
+    text += cells.join("\t") + "\n";
+  });
+
+  navigator.clipboard.writeText(text);
+  alert("Pivot table copied!");
+}
+
+addRow("Total Revenue", "", 23117.09);
+addRow("Management Fee & platform fee", "", -4161.08);
+addRow("Housekeeping & Supplies Fees", "", -1804.90);
+addRow("OTA & host fees", "", -2908.17);
+
+addRow("Rent & Lease Expense", "", 15049.00);
+addRow("Facilities Management Program Charge", "", 165.00);
+addRow("Common Area Maintenance", "", 16548.88);
+addRow("Common Area Maintenance", "", 137.14);
+addRow("Utilities - Electric", "", 471.65);
+addRow("Monthly Brand Design Services", "", 500.00);
+addRow("Website Services", "", 500.00);
+addRow("Monthly Social Media Services", "", 500.00);
+addRow("Utilities - Water", "", 217.98);
+addRow("Reactive Labor - Maintenance", "Maintenance labor", 212.50);
+addRow("CAPEX", "hosing, clamps, ties (new dishwasher installment)", 373.03);
+
+generateOutput();
+</script>
 </body>
 </html>
