@@ -49,7 +49,18 @@ Department: Prop Service G&A
 
 <label>Expected Statement Amount</label>
 <input id="expectedAmount" type="number" step="0.01" placeholder="Enter amount from statement" oninput="generateOutput()">
-
+<div class="check-box">
+<h2>Statement Reconciliation</h2>
+<table>
+<tbody>
+<tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
+<tr><td><strong>Total Expenses</strong></td><td id="totalExpenses">$0.00</td></tr>
+<tr><td><strong>Calculated Statement Amount</strong></td><td id="calculatedStatement">$0.00</td></tr>
+<tr><td><strong>Expected Statement Amount</strong></td><td id="expectedDisplay">$0.00</td></tr>
+<tr><td><strong>Difference</strong></td><td id="differenceDisplay">$0.00</td></tr>
+</tbody>
+</table>
+</div>
 <table>
 <thead>
 <tr>
@@ -69,18 +80,7 @@ Department: Prop Service G&A
 
 <div class="summary" id="totalBox">Total Entered: $0.00</div>
 
-<div class="check-box">
-<h2>Control Check</h2>
-<table>
-<tbody>
-<tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
-<tr><td><strong>Total Expenses</strong></td><td id="totalExpenses">$0.00</td></tr>
-<tr><td><strong>Calculated Statement Amount</strong></td><td id="calculatedStatement">$0.00</td></tr>
-<tr><td><strong>Expected Statement Amount</strong></td><td id="expectedDisplay">$0.00</td></tr>
-<tr><td><strong>Difference</strong></td><td id="differenceDisplay">$0.00</td></tr>
-</tbody>
-</table>
-</div>
+
 
 <h2>Airbase Pivot Output</h2>
 
