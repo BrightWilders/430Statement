@@ -18,13 +18,17 @@ button{border:none;border-radius:8px;padding:10px 14px;margin-top:15px;cursor:po
 .btn-red{background:#b54b4b;color:white}
 .btn-copy{background:#4d5f7a;color:white}
 .summary{margin-top:20px;padding:15px;background:#eef3ea;border-radius:10px;font-weight:bold}
-.fixed-box{background:#f1eadf;padding:15px;border-radius:10px;margin-bottom:20px;font-size:14px}
+.fixed-box{background:#f1eadf;padding:18px;border-radius:10px;margin-bottom:20px;font-size:14px}
+.fixed-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.bill-description{font-size:18px;font-weight:bold;margin-top:12px}
 .customGL{display:none}
 .check-box{padding:18px;background:#f7f7f7;border-radius:10px;border:1px solid #ddd}
 .good{color:#2f7d32;font-weight:bold}
 .bad{color:#b00020;font-weight:bold}
-.top-section{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:20px}
-@media(max-width:900px){.top-section{grid-template-columns:1fr}}
+.recon-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:20px}
+@media(max-width:900px){
+  .fixed-grid,.recon-layout{grid-template-columns:1fr}
+}
 </style>
 </head>
 
@@ -33,36 +37,49 @@ button{border:none;border-radius:8px;padding:10px 14px;margin-top:15px;cursor:po
 <h1>Owner Statement Airbase Tool</h1>
 
 <div class="fixed-box">
-<strong>Fixed Coding:</strong><br>
-Category: 1740-0303--Investment in sub - Kress Penthouse - Brightwild<br>
-Class: 430 Fleming<br>
-Department: Prop Service G&A
+  <div class="fixed-grid">
+    <div>
+      <strong>Fixed Coding:</strong><br>
+      Category: 1740-0303--Investment in sub - Kress Penthouse - Brightwild<br>
+      Class: 430 Fleming<br>
+      Department: Prop Service G&A
+
+      <div class="bill-description">
+        Bill Description: <span id="billDescription">April 2026 Net Proceeds</span>
+      </div>
+    </div>
+
+    <div>
+      <label>Statement Month</label>
+      <select id="month" onchange="generateOutput()">
+        <option>January</option><option>February</option><option>March</option><option selected>April</option>
+        <option>May</option><option>June</option><option>July</option><option>August</option>
+        <option>September</option><option>October</option><option>November</option><option>December</option>
+      </select>
+
+      <label>Statement Year</label>
+      <input id="year" type="number" value="2026" oninput="generateOutput()">
+    </div>
+  </div>
 </div>
 
-<div class="top-section">
+<div class="recon-layout">
   <div>
-    <label>Statement Month</label>
-    <select id="month">
-    <option>January</option><option>February</option><option>March</option><option selected>April</option>
-    <option>May</option><option>June</option><option>July</option><option>August</option>
-    <option>September</option><option>October</option><option>November</option><option>December</option>
-    </select>
+    <label>Total Expenses from Statement</label>
+    <input id="manualExpenses" type="number" step="0.01" placeholder="Enter total expenses" oninput="generateOutput()">
 
-    <label>Statement Year</label>
-    <input id="year" type="number" value="2026">
-
-    <label>Expected Statement Amount</label>
-    <input id="expectedAmount" type="number" step="0.01" placeholder="Enter amount from statement" oninput="generateOutput()">
+    <label>Net Revenue from Statement</label>
+    <input id="manualNetRevenue" type="number" step="0.01" placeholder="Enter net revenue" oninput="generateOutput()">
   </div>
 
   <div class="check-box">
     <h2 style="margin-top:0;">Statement Reconciliation</h2>
     <table style="margin-top:0;">
     <tbody>
-    <tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
     <tr><td><strong>Total Expenses</strong></td><td id="totalExpenses">$0.00</td></tr>
-    <tr><td><strong>Backed-In Statement Amount</strong></td><td id="calculatedStatement">$0.00</td></tr>
+    <tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
     <tr><td><strong>Expected Statement Amount</strong></td><td id="expectedDisplay">$0.00</td></tr>
+    <tr><td><strong>Backed-In Statement Amount</strong></td><td id="backedInStatement">$0.00</td></tr>
     <tr><td><strong>Difference</strong></td><td id="differenceDisplay">$0.00</td></tr>
     </tbody>
     </table>
@@ -136,6 +153,12 @@ function getSavedGLs(){
 
 function getGLList(){
   return [...new Set([...BASE_GL_LIST, ...getSavedGLs()])];
+}
+
+function updateBillDescription(){
+  const month = document.getElementById("month").value;
+  const year = document.getElementById("year").value;
+  document.getElementById("billDescription").innerText = `${month} ${year} Net Proceeds`;
 }
 
 function addRow(gl="", memo="", amount=""){
@@ -228,6 +251,8 @@ function formatCurrency(num){
 }
 
 function generateOutput(){
+  updateBillDescription();
+
   const rows = getRows();
   const outputBody = document.getElementById("outputBody");
   outputBody.innerHTML = "";
@@ -240,28 +265,9 @@ function generateOutput(){
   const totalEntered = rows.reduce((sum, r) => sum + r.amount, 0);
   document.getElementById("totalBox").innerText = `Total Entered: ${formatCurrency(totalEntered)}`;
 
-  const netRevenue = specialRows.reduce((sum, r) => sum + r.amount, 0);
-  const totalExpenses = normalRows.reduce((sum, r) => sum + r.amount, 0);
-  const calculatedStatementAmount = totalExpenses - netRevenue;
-
-  const expectedAmount = parseFloat(document.getElementById("expectedAmount").value) || 0;
-  const difference = calculatedStatementAmount - expectedAmount;
-
-  document.getElementById("netRevenue").innerText = formatCurrency(netRevenue);
-  document.getElementById("totalExpenses").innerText = formatCurrency(totalExpenses);
-  document.getElementById("calculatedStatement").innerText = formatCurrency(calculatedStatementAmount);
-  document.getElementById("expectedDisplay").innerText = formatCurrency(expectedAmount);
-
-  const differenceCell = document.getElementById("differenceDisplay");
-  differenceCell.innerText = formatCurrency(difference);
-
-  if(Math.abs(difference) < 0.01){
-    differenceCell.className = "good";
-    differenceCell.innerText += " ✅";
-  } else {
-    differenceCell.className = "bad";
-    differenceCell.innerText += " ❌";
-  }
+  const manualExpenses = parseFloat(document.getElementById("manualExpenses").value) || 0;
+  const manualNetRevenue = parseFloat(document.getElementById("manualNetRevenue").value) || 0;
+  const expectedStatementAmount = manualExpenses - manualNetRevenue;
 
   if(specialRows.length){
     const memo = SPECIAL_GROUPS.map(gl => {
@@ -269,7 +275,8 @@ function generateOutput(){
       return found ? `${gl} (${money(found.amount)})` : null;
     }).filter(Boolean).join(", ");
 
-    const airbaseAmount = netRevenue * -1;
+    const specialNetRevenue = specialRows.reduce((sum, r) => sum + r.amount, 0);
+    const airbaseAmount = specialNetRevenue * -1;
 
     outputRows.push({
       memo: memo,
@@ -318,15 +325,33 @@ function generateOutput(){
     outputBody.appendChild(tr);
   });
 
-  const grandTotal = outputRows.reduce((sum, r) => sum + r.amount, 0);
+  const backedInStatementAmount = outputRows.reduce((sum, r) => sum + r.amount, 0);
 
   const totalRow = document.createElement("tr");
   totalRow.innerHTML = `
     <td></td>
     <td><strong>Grand Total</strong></td>
-    <td><strong>${formatAmount(grandTotal)}</strong></td>
+    <td><strong>${formatAmount(backedInStatementAmount)}</strong></td>
   `;
   outputBody.appendChild(totalRow);
+
+  const difference = backedInStatementAmount - expectedStatementAmount;
+
+  document.getElementById("totalExpenses").innerText = formatCurrency(manualExpenses);
+  document.getElementById("netRevenue").innerText = formatCurrency(manualNetRevenue);
+  document.getElementById("expectedDisplay").innerText = formatCurrency(expectedStatementAmount);
+  document.getElementById("backedInStatement").innerText = formatCurrency(backedInStatementAmount);
+
+  const differenceCell = document.getElementById("differenceDisplay");
+  differenceCell.innerText = formatCurrency(difference);
+
+  if(Math.abs(difference) < 0.01){
+    differenceCell.className = "good";
+    differenceCell.innerText += " ✅";
+  } else {
+    differenceCell.className = "bad";
+    differenceCell.innerText += " ❌";
+  }
 }
 
 function copyTable(){
