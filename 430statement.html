@@ -3,25 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>430 Fleming Owner Statement → Airbase Helper</title>
+  <title>430 Fleming → Airbase Processor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root { --blue:#007acc; --bg:#f4f7fa; --line:#d8dde3; --text:#1f2933; --navy:#0d3b66; --green:#eaf7ef; --yellow:#fff8e6; --purple:#f3edff; --teal:#e8f7fb; --orange:#fff1e8; }
     * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin:0; padding:30px; color:var(--text); }
-    .container { max-width:1400px; margin:auto; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.1); padding:24px; }
-    h1 { margin:0 0 8px; color:#0d3b66; }
-    .sub { margin:0 0 22px; color:#607080; }
-    .drop { border:3px dashed var(--blue); border-radius:12px; padding:34px; text-align:center; background:#e8f7fb; cursor:pointer; transition:.15s; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background:#eef3f7; margin:0; padding:20px; color:var(--text); }
+    .container { max-width:1180px; margin:auto; background:#fff; border-radius:16px; box-shadow:0 4px 18px rgba(13,59,102,.14); overflow:hidden; }
+    .topbar { padding:18px 22px 14px; background:linear-gradient(90deg,#0d3b66,#007acc); color:#fff; }
+    h1 { margin:0 0 3px; color:#fff; font-size:25px; letter-spacing:.2px; }
+    .sub { margin:0; color:#e4f2fb; font-size:13px; }
+    .content { padding:18px 22px 22px; }
+    .drop { border:1.5px dashed #8bbbd8; border-radius:10px; padding:10px 14px; text-align:left; background:#f6fbfe; cursor:pointer; transition:.15s; display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; margin-bottom:14px; }
     .drop.drag { background:#e7f4ff; transform:scale(1.005); }
-    .drop strong { font-size:20px; display:block; margin-bottom:6px; }
+    .drop strong { font-size:16px; display:inline-block; margin:0 8px 0 0; color:#0d3b66; }
     input[type=file] { display:none; }
-    .status { margin:14px 0 0; font-weight:600; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top:22px; }
-    .section { border:1px solid var(--line); border-radius:10px; padding:16px; background:#fff; }
-    .section-check { background:var(--yellow); border-color:#f2cf73; }
-    .section-detail { background:var(--purple); border-color:#cdb7f6; }
-    .section-airbase { background:var(--green); border-color:#9fd5ad; }
+    .status { margin:0; font-weight:600; text-align:right; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:14px; }
+    .section { border:1px solid var(--line); border-radius:12px; padding:13px; background:#fff; }
+    .section-check { background:#fbfcfe; border-color:#d8dde3; }
+    .section-detail { background:#fbfcfe; border-color:#d8dde3; }
+    .section-airbase { background:#fff; border:2px solid #0d3b66; box-shadow:0 2px 10px rgba(13,59,102,.08); }
     h2 { margin:0 0 12px; font-size:18px; color:#0d3b66; }
     label { font-size:12px; font-weight:700; color:#657487; display:block; margin-bottom:4px; }
     input, select, textarea { width:100%; padding:8px; border:1px solid #cdd5df; border-radius:5px; font-family:inherit; }
@@ -45,17 +47,17 @@
     .pill { display:inline-block; background:#eef3f7; border:1px solid #d0d7de; border-radius:999px; padding:4px 8px; margin:2px; font-size:12px; }
     .fixed-value { font-weight:700; }
     details { border:1px solid var(--line); border-radius:8px; background:rgba(255,255,255,.72); }
-    details summary { cursor:pointer; list-style:none; font-weight:800; color:#0d3b66; padding:14px 16px; background:rgba(255,255,255,.55); border-radius:8px; }
+    details summary { cursor:pointer; list-style:none; font-weight:800; color:#0d3b66; padding:11px 14px; background:#f7f9fb; border-radius:8px; }
     details summary::-webkit-details-marker { display:none; }
     details[open] summary { border-bottom:1px solid var(--line); border-radius:8px 8px 0 0; }
-    .details-body { padding:16px; }
-    .coding-mini { border:1px solid #9fd5ad; border-radius:10px; padding:13px 15px; background:rgba(255,255,255,.78); margin:8px 0 12px; font-size:15px; line-height:1.55; color:#344054; }
+    .details-body { padding:14px; }
+    .coding-mini { border:1px solid #d0d7de; border-radius:10px; padding:12px 14px; background:#f8fafc; margin:8px 0 12px; font-size:14px; line-height:1.55; color:#344054; }
     .coding-mini b { color:#0d3b66; }
-    .coding-mini .owner-line { display:block; font-size:18px; font-weight:800; color:#0d3b66; margin-bottom:3px; }
-    .coding-mini .coding-line { display:block; }
-    .bill-desc { border:1px solid #0d3b66; border-radius:8px; padding:10px 12px; margin:10px 0; background:rgba(255,255,255,.85); font-size:16px; font-weight:800; color:#0d3b66; }
+    .coding-mini .owner-line { display:block; font-size:18px; font-weight:800; color:#0d3b66; margin-bottom:5px; }
+    .coding-mini .coding-line { display:block; font-size:13.5px; }
+    .bill-desc { border:1px solid #0d3b66; border-radius:8px; padding:10px 12px; margin:10px 0; background:#eef8fc; font-size:16px; font-weight:800; color:#0d3b66; }
     .invoice-meta { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin:10px 0 12px; }
-    .invoice-box { border:1px solid #b7d9c1; background:rgba(255,255,255,.72); border-radius:8px; padding:9px 11px; font-size:14px; }
+    .invoice-box { border:1px solid #d0d7de; background:#fff; border-radius:8px; padding:9px 11px; font-size:14px; }
     .invoice-box b { color:#0d3b66; display:block; margin-bottom:2px; }
     .review-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; }
     @media(max-width:900px){ .grid,.row,.review-grid,.invoice-meta{grid-template-columns:1fr;} .full{grid-column:auto;} }
@@ -63,13 +65,14 @@
 </head>
 <body>
 <div class="container">
-  <h1>430 Fleming Owner Statement → Airbase Helper</h1>
-  <p class="sub">Drop the owner statement PDF, review the extracted rows, then use the Amount + Memo table for Airbase.</p>
-
+  <div class="topbar">
+    <h1>430 Fleming → Airbase Processor</h1>
+    <p class="sub">Drop the owner statement PDF, then review the Airbase information and memo rows.</p>
+  </div>
+  <div class="content">
 
   <div id="drop" class="drop">
-    <strong>Drop PDF here</strong>
-    or click to choose a file
+    <div><strong>Drop PDF here</strong><span class="small">or click to choose a file</span></div>
     <input id="fileInput" type="file" accept="application/pdf" />
     <div id="status" class="status small">Waiting for PDF…</div>
   </div>
@@ -125,7 +128,7 @@
       <h2>Airbase Information</h2>
       <div class="coding-mini">
         <span class="owner-line"><b>Vendor:</b> <span id="vendor">One of One Technologies, Inc - OW</span></span>
-        <span class="coding-line"><b>Owner:</b> <span id="owner">One Of One RE Holdings LLC</span> &nbsp; | &nbsp; <b>Class:</b> <span id="unitClass">430 Fleming</span> &nbsp; | &nbsp; <b>Department:</b> <span id="department">Prop. Service G&A</span> &nbsp; | &nbsp; <b>Default Category:</b> <span id="defaultCategory">1740-0303 Investment in sub - Kress Penthouse - Brightwild</span></span>
+        <span class="coding-line"><b>Entity:</b> <span id="owner">RE - RE Holdings</span> &nbsp; | &nbsp; <b>Class:</b> <span id="unitClass">430 Fleming</span> &nbsp; | &nbsp; <b>Department:</b> <span id="department">Prop. Service G&A</span> &nbsp; | &nbsp; <b>Default Category:</b> <span id="defaultCategory">1740-0303 Investment in sub - Kress Penthouse - Brightwild</span></span>
       </div>
       <div class="invoice-meta">
         <div class="invoice-box"><b>Invoice #</b><span id="invoiceNumberPreview">Drop PDF to auto-fill</span></div>
@@ -142,6 +145,7 @@
         <button class="secondary" onclick="downloadCSV()">Download CSV</button>
       </div>
     </div>
+  </div>
   </div>
 </div>
 
