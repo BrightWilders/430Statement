@@ -305,20 +305,113 @@ function extractRows(text){
   const lines = text.split('\n').map(clean).filter(Boolean);
   const moneyEnd = /(-?\$?[\d,]+\.\d{2})$/;
   const datePat = /(\d{2}\s+[A-Za-z]{3}\s+\d{2})/;
+
+  function findBestDescription(rowIndex, beforeDate){
+    let candidate = clean(beforeDate);
+
+    // Lines like "upon receipt" or "Invoice Marketing Services..." are not
+    // the Airbase memo. The real recurring service description is usually
+    // 1-3 lines above the dated amount row.
+    const bad = v => !v || /^invoice\b/i.test(v) || /^upon receipt$/i.test(v) || /^due\b/i.test(v) || /due upon receipt/i.test(v) || isSectionOrHeader(v) || moneyEnd.test(v) || datePat.test(v);
+
+    if (!bad(candidate)) return candidate;
+
+    for (let j = rowIndex - 1; j >= Math.max(0, rowIndex - 5); j--) {
+      const prev = clean(lines[j]);
+      if (!bad(prev)) return prev;
+    }
+    return candidate;
+  }
+
   for (let i=0; i<lines.length; i++) {
     const line = lines[i];
     if (!moneyEnd.test(line) || !datePat.test(line)) continue;
     if (/Net Owner Revenue|Balance|Payouts|ADR|Nights|Rental Revenue/i.test(line)) continue;
+
     const amountStr = line.match(moneyEnd)[1];
     const amount = parseMoney(amountStr);
     if (!amount) continue;
+
     const date = (line.match(datePat)||[])[1] || '';
-    const beforeDate = clean(line.split(date)[0]);
+    let beforeDate = clean(line.split(date)[0]);
     const afterDate = clean(line.split(date).slice(1).join(date).replace(moneyEnd,''));
     const cat = afterDate || '';
     if (!cat || !/\d{4}/.test(cat)) continue;
-    rawLines.push({use:true, description:beforeDate, date, category:cat, amount, memo:categoryToMemo(cat, beforeDate)});
+
+    const description = findBestDescription(i, beforeDate);
+    const memo = categoryToMemo(cat, description);
+    rawLines.push({use:true, description, date, category:cat, amount, memo});
   }
+
+  ensureRequiredAirbaseRows(text);
+}
+
+function hasRowMemo(memo){
+  return rawLines.some(r => String(r.memo || '').toLowerCase() === String(memo || '').toLowerCase());
+}
+
+function addExtractedRow(description, date, category, amount, memo){
+  if (hasRowMemo(memo)) return;
+  rawLines.push({use:true, description, date: date || '', category, amount, memo});
+}
+
+function findAmountAfter(text, phraseRegex, categoryRegex){
+  const re = new RegExp(phraseRegex + '[\s\S]{0,500}?(\d{2}\s+[A-Za-z]{3}\s+\d{2})[\s\S]{0,260}?(' + categoryRegex + ')[\s\S]{0,180}?(-?\$?[\d,]+\.\d{2})', 'i');
+  const m = text.match(re);
+  if (!m) return null;
+  return {date:m[1], category:clean(m[2]), amount:parseMoney(m[3])};
+}
+
+function sumCategory(text, categoryRegex){
+  const re = new RegExp('(\d{2}\s+[A-Za-z]{3}\s+\d{2})[\s\S]{0,120}?(' + categoryRegex + ')[\s\S]{0,120}?(-?\$?[\d,]+\.\d{2})', 'gi');
+  let m, total = 0, found = false, lastDate = '', lastCat = '';
+  while ((m = re.exec(text)) !== null) {
+    const amt = parseMoney(m[3]);
+    if (!isNaN(amt)) { found = true; total += amt; lastDate = m[1]; lastCat = clean(m[2]); }
+  }
+  return found ? {date:lastDate, category:lastCat, amount:total} : null;
+}
+
+function ensureRequiredAirbaseRows(text){
+  // These rows must never disappear. PDF.js sometimes splits the recurring
+  // marketing description, the invoice wording, and the amount across separate
+  // lines. This fallback searches the full PDF text and adds any missing rows.
+  const marketingCat = '7581 - Outside Services - Sales & Marketing Consulting';
+  const marketingRows = [
+    ['Monthly\s+Brand\s+Design\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Monthly Brand Design Services', 'Monthly Brand Design Services'],
+    ['Website\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Website Services', 'Website Services'],
+    ['Monthly\s+Social\s+Media\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Monthly Social Media Services', 'Monthly Social Media Services']
+  ];
+  marketingRows.forEach(([phraseRegex, description, memo]) => {
+    if (hasRowMemo(memo)) return;
+    const r = findAmountAfter(text, phraseRegex, '7581\s*-\s*Outside\s+Services\s*-\s*Sales\s*&\s*Marketing\s+Consulting');
+    if (r) addExtractedRow(description, r.date, marketingCat, r.amount, memo);
+  });
+
+  if (!hasRowMemo('Rent & Lease Expense')) {
+    const r = sumCategory(text, '7400\s*-\s*Rent\s+Expense');
+    if (r) addExtractedRow('Rent & Lease Expense', r.date, '7400 - Rent Expense', r.amount, 'Rent & Lease Expense');
+  }
+  if (!hasRowMemo('Common Area Maintenance')) {
+    const r = sumCategory(text, '7402\s*-\s*CAM\s+Expense');
+    if (r) addExtractedRow('Common Area Maintenance', r.date, '7402 - CAM Expense', r.amount, 'Common Area Maintenance');
+  }
+  if (!hasRowMemo('Facilities Management Program Charge')) {
+    const r = findAmountAfter(text, 'Monthly\s+Fee\s+for\s+the\s+Preventative\s+Maintenance\s+Plan', '7800\s*-\s*Facilities\s+Management\s+Program\s+Charge');
+    if (r) addExtractedRow('Monthly Fee for the Preventative Maintenance Plan', r.date, '7800 - Facilities Management Program Charge', r.amount, 'Facilities Management Program Charge');
+  }
+  if (!hasRowMemo('Utilities - Electric')) {
+    const r = sumCategory(text, '7901\s*-\s*Utilities\s*-\s*Electric');
+    if (r) addExtractedRow('Utilities - Electric', r.date, '7901 - Utilities - Electric', r.amount, 'Utilities - Electric');
+  }
+  if (!hasRowMemo('Utilities - Water')) {
+    const r = sumCategory(text, '7902\s*-\s*Utilities\s*-\s*Water');
+    if (r) addExtractedRow('Utilities - Water', r.date, '7902 - Utilities - Water', r.amount, 'Utilities - Water');
+  }
+}
+
+function isSectionOrHeader(line){
+  return /^(General & Administrative|Sales & Marketing|Property Operations & Maintenance|Utilities|Description|Date|Category|Total|One of One Florida VR LLC|Owner Statement)/i.test(clean(line));
 }
 
 function categoryToMemo(cat, desc){
@@ -329,10 +422,11 @@ function categoryToMemo(cat, desc){
   if (c.includes('utilities - electric')) return 'Utilities - Electric';
   if (c.includes('utilities - water')) return 'Utilities - Water';
   if (c.includes('sales & marketing')) {
-    if (/website/i.test(desc)) return 'Website Services';
-    if (/brand/i.test(desc)) return 'Monthly Brand Design Services';
-    if (/social/i.test(desc)) return 'Monthly Social Media Services';
-    return 'Sales & Marketing Services';
+    // Keep the three recurring marketing lines separate. Do not combine them.
+    if (/monthly\s+brand\s+design/i.test(desc) || /brand/i.test(desc)) return 'Monthly Brand Design Services';
+    if (/website\s+services/i.test(desc) || /website/i.test(desc)) return 'Website Services';
+    if (/monthly\s+social\s+media/i.test(desc) || /social/i.test(desc)) return 'Monthly Social Media Services';
+    return desc || 'Sales & Marketing Services';
   }
   if (c.includes('reactive labor')) return 'Reactive Labor - Maintenance';
   if (c.includes('reactive supplies')) return 'Reactive Supplies';
@@ -411,7 +505,37 @@ function reactiveSupplyItems(descriptions){
   return items;
 }
 
+function preferredOrderIndex(memo){
+  const m = String(memo || '').toLowerCase().replace(/[–—]/g,'-').trim();
+
+  // Exact Airbase line-item order requested.
+  // Anything not listed here stays after these rows in the same order it appeared on the PDF.
+  if (m.startsWith('total revenue')) return 10;
+  if (m === 'rent & lease expense') return 20;
+  if (m === 'facilities management program charge') return 30;
+  if (m === 'common area maintenance') return 40;
+  if (m === 'monthly brand design services') return 50;
+  if (m === 'website services') return 60;
+  if (m === 'monthly social media services') return 70;
+  if (m === 'utilities - electric') return 80;
+  if (m === 'utilities - water') return 90;
+  if (m.includes('reactive labor') && m.includes('maintenance')) return 100;
+
+  return 1000;
+}
+
+function sortGroupedRows(){
+  grouped = grouped.map((g, idx) => ({...g, originalIndex: g.originalIndex ?? idx}))
+    .sort((a,b) => {
+      const ao = preferredOrderIndex(a.memo);
+      const bo = preferredOrderIndex(b.memo);
+      if (ao !== bo) return ao - bo;
+      return (a.originalIndex || 0) - (b.originalIndex || 0);
+    });
+}
+
 function renderGrouped(){
+  sortGroupedRows();
   const tbody = document.querySelector('#airbaseTable tbody');
   tbody.innerHTML = '';
   let total = 0;
