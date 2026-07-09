@@ -1,389 +1,461 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Owner Statement Airbase Tool</title>
-<style>
-body{font-family:Arial,sans-serif;background:#f6f4ef;margin:0;padding:30px;color:#2f2f2f}
-.container{max-width:1350px;margin:auto;background:white;padding:30px;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
-h1{margin-top:0}
-label{font-weight:bold;display:block;margin-top:12px}
-input,select{width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
-th{background:#3b2f2f;color:white;padding:9px;text-align:left}
-td{border:1px solid #ddd;padding:7px}
-button{border:none;border-radius:8px;padding:10px 14px;margin-top:15px;cursor:pointer;font-weight:bold}
-.btn-main{background:#6f4e37;color:white}
-.btn-green{background:#4f7d57;color:white}
-.btn-red{background:#b54b4b;color:white}
-.btn-copy{background:#4d5f7a;color:white}
-.summary{margin-top:20px;padding:15px;background:#eef3ea;border-radius:10px;font-weight:bold}
-.fixed-box{background:#f1eadf;padding:18px;border-radius:10px;margin-bottom:20px;font-size:14px}
-.fixed-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
-.bill-description{font-size:18px;font-weight:bold;margin-top:12px}
-.customGL{display:none}
-.check-box{padding:18px;background:#f7f7f7;border-radius:10px;border:1px solid #ddd}
-.good{color:#2f7d32;font-weight:bold}
-.bad{color:#b00020;font-weight:bold}
-.recon-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:20px}
-@media(max-width:900px){
-  .fixed-grid,.recon-layout{grid-template-columns:1fr}
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>430 Fleming Owner Statement → Airbase Helper</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root { --blue:#007acc; --bg:#f4f7fa; --line:#d8dde3; --text:#1f2933; --navy:#0d3b66; --green:#eaf7ef; --yellow:#fff8e6; --purple:#f3edff; --teal:#e8f7fb; --orange:#fff1e8; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin:0; padding:30px; color:var(--text); }
+    .container { max-width:1400px; margin:auto; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.1); padding:24px; }
+    h1 { margin:0 0 8px; color:#0d3b66; }
+    .sub { margin:0 0 22px; color:#607080; }
+    .drop { border:3px dashed var(--blue); border-radius:12px; padding:34px; text-align:center; background:#e8f7fb; cursor:pointer; transition:.15s; }
+    .drop.drag { background:#e7f4ff; transform:scale(1.005); }
+    .drop strong { font-size:20px; display:block; margin-bottom:6px; }
+    input[type=file] { display:none; }
+    .status { margin:14px 0 0; font-weight:600; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top:22px; }
+    .section { border:1px solid var(--line); border-radius:10px; padding:16px; background:#fff; }
+    .section-check { background:var(--yellow); border-color:#f2cf73; }
+    .section-detail { background:var(--purple); border-color:#cdb7f6; }
+    .section-airbase { background:var(--green); border-color:#9fd5ad; }
+    h2 { margin:0 0 12px; font-size:18px; color:#0d3b66; }
+    label { font-size:12px; font-weight:700; color:#657487; display:block; margin-bottom:4px; }
+    input, select, textarea { width:100%; padding:8px; border:1px solid #cdd5df; border-radius:5px; font-family:inherit; }
+    textarea { min-height:85px; resize:vertical; }
+    .row { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:10px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th, td { border:1px solid var(--line); padding:8px; vertical-align:top; }
+    th { background:#eef3f7; text-align:left; }
+    td input, td select { padding:5px; font-size:12px; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    button { border:0; border-radius:6px; padding:10px 14px; cursor:pointer; background:var(--blue); color:#fff; font-weight:700; }
+    button.secondary { background:#5f6b7a; }
+    button.danger { background:#b42318; }
+    button.good { background:#137333; }
+    .full { grid-column: 1 / -1; }
+    .small { font-size:12px; color:#667085; }
+    .money { text-align:right; white-space:nowrap; }
+    .warn { color:#b54708; font-weight:700; }
+    .ok { color:#137333; font-weight:700; }
+    pre { white-space:pre-wrap; background:#0b1220; color:#e5e7eb; padding:14px; border-radius:8px; max-height:300px; overflow:auto; }
+    .pill { display:inline-block; background:#eef3f7; border:1px solid #d0d7de; border-radius:999px; padding:4px 8px; margin:2px; font-size:12px; }
+    .fixed-value { font-weight:700; }
+    details { border:1px solid var(--line); border-radius:8px; background:rgba(255,255,255,.72); }
+    details summary { cursor:pointer; list-style:none; font-weight:800; color:#0d3b66; padding:14px 16px; background:rgba(255,255,255,.55); border-radius:8px; }
+    details summary::-webkit-details-marker { display:none; }
+    details[open] summary { border-bottom:1px solid var(--line); border-radius:8px 8px 0 0; }
+    .details-body { padding:16px; }
+    .coding-mini { border:1px solid #9fd5ad; border-radius:10px; padding:13px 15px; background:rgba(255,255,255,.78); margin:8px 0 12px; font-size:15px; line-height:1.55; color:#344054; }
+    .coding-mini b { color:#0d3b66; }
+    .coding-mini .owner-line { display:block; font-size:18px; font-weight:800; color:#0d3b66; margin-bottom:3px; }
+    .coding-mini .coding-line { display:block; }
+    .bill-desc { border:1px solid #0d3b66; border-radius:8px; padding:10px 12px; margin:10px 0; background:rgba(255,255,255,.85); font-size:16px; font-weight:800; color:#0d3b66; }
+    .invoice-meta { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin:10px 0 12px; }
+    .invoice-box { border:1px solid #b7d9c1; background:rgba(255,255,255,.72); border-radius:8px; padding:9px 11px; font-size:14px; }
+    .invoice-box b { color:#0d3b66; display:block; margin-bottom:2px; }
+    .review-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; }
+    @media(max-width:900px){ .grid,.row,.review-grid,.invoice-meta{grid-template-columns:1fr;} .full{grid-column:auto;} }
+  </style>
 </head>
-
 <body>
 <div class="container">
-<h1>Owner Statement Airbase Tool</h1>
+  <h1>430 Fleming Owner Statement → Airbase Helper</h1>
+  <p class="sub">Drop the owner statement PDF, review the extracted rows, then use the Amount + Memo table for Airbase.</p>
 
-<div class="fixed-box">
-  <div class="fixed-grid">
-    <div>
-      <strong>Fixed Coding:</strong><br>
-      Category: 1740-0303--Investment in sub - Kress Penthouse - Brightwild<br>
-      Class: 430 Fleming<br>
-      Department: Prop Service G&A
 
-      <div class="bill-description">
-        Bill Description: <span id="billDescription">April 2026 Net Proceeds</span>
+  <div id="drop" class="drop">
+    <strong>Drop PDF here</strong>
+    or click to choose a file
+    <input id="fileInput" type="file" accept="application/pdf" />
+    <div id="status" class="status small">Waiting for PDF…</div>
+  </div>
+
+  <div class="grid">
+    <div class="section section-check full">
+      <details>
+        <summary>Statement check + net revenue memo — open only if you need to verify or edit</summary>
+        <div class="details-body review-grid">
+          <div>
+            <h2>Statement Info</h2>
+            <input id="month" type="hidden" />
+            <input id="year" type="hidden" />
+            <div class="row">
+              <div><label>Net Revenue From PDF</label><input id="netRevenue" onchange="updateStatementAmount(); groupRows();" /></div>
+              <div><label>Expenses From PDF</label><input id="expensesTotal" onchange="updateStatementAmount(); groupRows();" /></div>
+              <div><label>Statement Amount</label><input id="statementAmount" readonly /></div>
+            </div>
+            <div class="small" id="summaryCheck"></div>
+          </div>
+          <div>
+            <h2>Net Revenue Memo Builder</h2>
+            <label>Airbase memo for net revenue line</label>
+            <textarea id="netMemo"></textarea>
+            <div class="small">This combines Total Revenue, Management Fee, HSK/Linens/Supplies, and OTA/CC/Other Fees.</div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="section section-detail full">
+      <details>
+        <summary>Detailed Extracted Information — open only if you need to verify or edit</summary>
+        <div class="details-body">
+          <div class="actions">
+            <button onclick="groupRows()">Regroup Rows</button>
+            <button class="secondary" onclick="addManualRow()">Add Manual Row</button>
+            <button class="danger" onclick="clearAll()">Clear</button>
+          </div>
+          <table id="rawTable">
+            <thead><tr><th>Use</th><th>Description</th><th>Date</th><th>GL / Category</th><th>Amount</th><th>Airbase Memo</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="actions">
+            <button class="secondary" onclick="toggleText()">Show / Hide PDF Text</button>
+          </div>
+          <pre id="pdfText" style="display:none;"></pre>
+        </div>
+      </details>
+    </div>
+
+    <div class="section section-airbase full">
+      <h2>Airbase Information</h2>
+      <div class="coding-mini">
+        <span class="owner-line"><b>Vendor:</b> <span id="vendor">One of One Technologies, Inc - OW</span></span>
+        <span class="coding-line"><b>Owner:</b> <span id="owner">One Of One RE Holdings LLC</span> &nbsp; | &nbsp; <b>Class:</b> <span id="unitClass">430 Fleming</span> &nbsp; | &nbsp; <b>Department:</b> <span id="department">Prop. Service G&A</span> &nbsp; | &nbsp; <b>Default Category:</b> <span id="defaultCategory">1740-0303 Investment in sub - Kress Penthouse - Brightwild</span></span>
+      </div>
+      <div class="invoice-meta">
+        <div class="invoice-box"><b>Invoice #</b><span id="invoiceNumberPreview">Drop PDF to auto-fill</span></div>
+        <div class="invoice-box"><b>Invoice Date</b><span id="invoiceDatePreview">Drop PDF to auto-fill</span></div>
+        <div class="invoice-box"><b>Payment Due Date</b><span id="paymentDueDatePreview">Drop PDF to auto-fill</span></div>
+      </div>
+      <div class="bill-desc" id="billDescriptionPreview">Bill Description: Drop PDF to auto-fill</div>
+      <div id="groupCheck" class="small"></div>
+      <table id="airbaseTable">
+        <thead><tr><th>Amount</th><th>Memo Description</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="actions">
+        <button class="secondary" onclick="downloadCSV()">Download CSV</button>
       </div>
     </div>
-
-    <div>
-      <label>Statement Month</label>
-      <select id="month" onchange="generateOutput()">
-        <option>January</option><option>February</option><option>March</option><option selected>April</option>
-        <option>May</option><option>June</option><option>July</option><option>August</option>
-        <option>September</option><option>October</option><option>November</option><option>December</option>
-      </select>
-
-      <label>Statement Year</label>
-      <input id="year" type="number" value="2026" oninput="generateOutput()">
-    </div>
   </div>
-</div>
-
-<div class="recon-layout">
-  <div>
-    <label>Total Expenses from Statement</label>
-    <input id="manualExpenses" type="number" step="0.01" placeholder="Enter total expenses" oninput="generateOutput()">
-
-    <label>Net Revenue from Statement</label>
-    <input id="manualNetRevenue" type="number" step="0.01" placeholder="Enter net revenue" oninput="generateOutput()">
-  </div>
-
-  <div class="check-box">
-    <h2 style="margin-top:0;">Statement Reconciliation</h2>
-    <table style="margin-top:0;">
-    <tbody>
-    <tr><td><strong>Total Expenses</strong></td><td id="totalExpenses">$0.00</td></tr>
-    <tr><td><strong>Net Revenue</strong></td><td id="netRevenue">$0.00</td></tr>
-    <tr><td><strong>Expected Statement Amount</strong></td><td id="expectedDisplay">$0.00</td></tr>
-    <tr><td><strong>Backed-In Statement Amount</strong></td><td id="backedInStatement">$0.00</td></tr>
-    <tr><td><strong>Difference</strong></td><td id="differenceDisplay">$0.00</td></tr>
-    </tbody>
-    </table>
-  </div>
-</div>
-
-<table>
-<thead>
-<tr>
-<th style="width:28%">GL</th>
-<th style="width:24%">Custom GL if needed</th>
-<th style="width:33%">Memo Detail</th>
-<th style="width:10%">Amount</th>
-<th style="width:5%">Remove</th>
-</tr>
-</thead>
-<tbody id="lines"></tbody>
-</table>
-
-<button class="btn-main" onclick="addRow()">+ Add Line</button>
-<button class="btn-green" onclick="generateOutput()">Generate Airbase Pivot</button>
-<button class="btn-copy" onclick="saveCustomGLs()">Save Custom GLs</button>
-
-<div class="summary" id="totalBox">Total Entered: $0.00</div>
-
-<h2>Airbase Pivot Output</h2>
-
-<table id="outputTable">
-<thead>
-<tr>
-<th style="width:8%">Line</th>
-<th style="width:72%">Airbase Memo</th>
-<th style="width:20%">SUM of Invoice S/B</th>
-</tr>
-</thead>
-<tbody id="outputBody"></tbody>
-</table>
-
-<button class="btn-copy" onclick="copyTable()">Copy Pivot Table</button>
 </div>
 
 <script>
-const SPECIAL_GROUPS = [
-  "Total Revenue",
-  "Management Fee & platform fee",
-  "Housekeeping & Supplies Fees",
-  "OTA & host fees"
-];
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-let BASE_GL_LIST = [
-  "Total Revenue",
-  "Management Fee & platform fee",
-  "Housekeeping & Supplies Fees",
-  "OTA & host fees",
-  "Rent & Lease Expense",
-  "Facilities Management Program Charge",
-  "Common Area Maintenance",
-  "Utilities - Electric",
-  "Utilities - Water",
-  "Monthly Brand Design Services",
-  "Website Services",
-  "Monthly Social Media Services",
-  "Reactive Labor - Maintenance",
-  "Reactive Supplies - Grounds",
-  "CAPEX"
-];
+let rawLines = [];
+let fullText = '';
+let grouped = [];
 
-function getSavedGLs(){
-  return JSON.parse(localStorage.getItem("ownerStatementCustomGLs") || "[]");
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const statusEl = document.getElementById('status');
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+document.addEventListener('input', e => { if (['month','year'].includes(e.target.id)) updateBillDescriptionPreview(); });
+
+function money(n){
+  if (n === '' || n === null || isNaN(n)) return '';
+  const v = Number(n);
+  return (v < 0 ? '-' : '') + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function parseMoney(s){
+  if (!s) return NaN;
+  s = String(s).replace(/[$,]/g,'').replace(/[−–—]/g,'-').trim();
+  if (/^\(.+\)$/.test(s)) s = '-' + s.slice(1,-1);
+  return Number(s);
+}
+function airbaseExpenseAmount(n){ return -(Number(n)||0); }
+function absAmountFromExpense(n){ return Math.abs(Number(n)||0); }
+function clean(s){ return (s||'').replace(/\s+/g,' ').trim(); }
+function fixedValue(id){
+  const el = document.getElementById(id);
+  return el?.dataset?.value || el?.textContent || el?.value || '';
+}
+function currentBillDescription(){
+  const m = document.getElementById('month').value;
+  const y = document.getElementById('year').value;
+  if (!m || !y) return '';
+  return `${m} ${y} Net Proceeds`;
+}
+function monthNumber(monthName){
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const idx = months.findIndex(m => m.toLowerCase() === String(monthName||'').toLowerCase());
+  return idx >= 0 ? idx + 1 : null;
+}
+function formatDateMMDDYYYY(date){
+  const mm = String(date.getMonth()+1).padStart(2,'0');
+  const dd = String(date.getDate()).padStart(2,'0');
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+function currentInvoiceInfo(){
+  const m = document.getElementById('month').value;
+  const y = Number(document.getElementById('year').value);
+  const mm = monthNumber(m);
+  if (!mm || !y) return {number:'', invoiceDate:'', dueDate:''};
+  const invoiceDateObj = new Date(y, mm, 0); // last day of statement month
+  const dueDateObj = new Date(y, mm, 15); // 15th of following month
+  return {
+    number: `${String(mm).padStart(2,'0')}.${y}`,
+    invoiceDate: formatDateMMDDYYYY(invoiceDateObj),
+    dueDate: formatDateMMDDYYYY(dueDateObj)
+  };
+}
+function updateBillDescriptionPreview(){
+  const m = document.getElementById('month').value;
+  const y = document.getElementById('year').value;
+  const desc = currentBillDescription();
+  const invoice = currentInvoiceInfo();
+  const invoiceNumberEl = document.getElementById('invoiceNumberPreview');
+  const invoiceDateEl = document.getElementById('invoiceDatePreview');
+  const paymentDueDateEl = document.getElementById('paymentDueDatePreview');
+  if (invoiceNumberEl) invoiceNumberEl.textContent = invoice.number || 'Drop PDF to auto-fill';
+  if (invoiceDateEl) invoiceDateEl.textContent = invoice.invoiceDate || 'Drop PDF to auto-fill';
+  if (paymentDueDateEl) paymentDueDateEl.textContent = invoice.dueDate || 'Drop PDF to auto-fill';
+  document.getElementById('billDescriptionPreview').textContent = desc ? `Bill Description: ${desc}` : 'Bill Description: Drop PDF to auto-fill';
 }
 
-function getGLList(){
-  return [...new Set([...BASE_GL_LIST, ...getSavedGLs()])];
+async function handleFile(file){
+  if (!file || file.type !== 'application/pdf') { statusEl.textContent = 'Please choose a PDF.'; return; }
+  statusEl.textContent = 'Reading PDF…';
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data}).promise;
+  let pages = [];
+  for (let p=1; p<=pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items.map(i => ({str:i.str, x:i.transform[4], y:i.transform[5]}));
+    pages.push(itemsToLines(items).join('\n'));
+  }
+  fullText = pages.join('\n');
+  document.getElementById('pdfText').textContent = fullText;
+  extractInfo(fullText);
+  extractRows(fullText);
+  renderRaw();
+  groupRows();
+  statusEl.textContent = `Loaded ${file.name}. Review the rows below.`;
 }
 
-function updateBillDescription(){
-  const month = document.getElementById("month").value;
-  const year = document.getElementById("year").value;
-  document.getElementById("billDescription").innerText = `${month} ${year} Net Proceeds`;
+function itemsToLines(items){
+  items.sort((a,b) => (b.y-a.y) || (a.x-b.x));
+  const lines = [];
+  let currentY = null, line = [];
+  for (const item of items) {
+    if (currentY === null || Math.abs(item.y-currentY) < 3) {
+      line.push(item); currentY = currentY ?? item.y;
+    } else {
+      line.sort((a,b)=>a.x-b.x);
+      lines.push(line.map(i=>i.str).join(' '));
+      line = [item]; currentY = item.y;
+    }
+  }
+  if (line.length) { line.sort((a,b)=>a.x-b.x); lines.push(line.map(i=>i.str).join(' ')); }
+  return lines.map(clean).filter(Boolean);
 }
 
-function addRow(gl="", memo="", amount=""){
-  const tbody = document.getElementById("lines");
-  const row = document.createElement("tr");
-
-  const options = getGLList().map(g =>
-    `<option ${g===gl ? "selected" : ""}>${g}</option>`
-  ).join("");
-
-  row.innerHTML = `
-    <td>
-      <select class="gl" onchange="toggleCustomGL(this); generateOutput();">
-        ${options}
-        <option value="__CUSTOM__">+ Add New GL</option>
-      </select>
-    </td>
-    <td><input class="customGL" placeholder="Type new GL name" oninput="generateOutput()"></td>
-    <td><input class="memo" value="${memo}" placeholder="Example: Stepping stones" oninput="generateOutput()"></td>
-    <td><input class="amount" type="number" step="0.01" value="${amount}" oninput="generateOutput()"></td>
-    <td><button class="btn-red" onclick="removeRow(this)">X</button></td>
-  `;
-
-  tbody.appendChild(row);
-  generateOutput();
+function extractInfo(text){
+  const owner = (text.match(/Owner\s+(.+?)\s+Email/i)||[])[1] || '';
+  const monthYear = (text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})\s+-\s+Summary/i)||[]);
+  const unit = (text.match(/\n(\d{3,4}\s+[A-Za-z][^\n]+?)\n\d{3,4}\s+[^\n]+Owner/i)||[])[1] || (text.match(/\n(\d{3,4}\s+[A-Za-z][^\n]+)/)||[])[1] || '';
+  const netRevenue = (text.match(/Net revenue\s+\$?(-?[\d,]+\.\d{2})/i)||[])[1] || '';
+  const expensesTotal = (text.match(/Expenses\s+(-?\$?[\d,]+\.\d{2})/i)||[])[1] || '';
+  // Fixed coding is intentionally not overwritten by the PDF.
+  document.getElementById('month').value = monthYear[1] || '';
+  document.getElementById('year').value = monthYear[2] || '';
+  updateBillDescriptionPreview();
+  document.getElementById('netRevenue').value = netRevenue;
+  document.getElementById('expensesTotal').value = expensesTotal;
+  updateStatementAmount();
+  buildNetMemo(text);
 }
 
-function toggleCustomGL(select){
-  const row = select.closest("tr");
-  const customInput = row.querySelector(".customGL");
-
-  if(select.value === "__CUSTOM__"){
-    customInput.style.display = "block";
-    customInput.focus();
+function buildNetMemo(text){
+  const m = text.match(/Net Owner Revenue[\s\S]*?\$?([\d,]+\.\d{2})\s+\d+\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})/i);
+  if (m) {
+    const rental = m[2], mgmt = m[6], hsk = m[7], ota = m[8];
+    document.getElementById('netMemo').value = `Total Revenue (${rental}) Management Fee & platform fee (${mgmt}), Housekeeping & Supplies Fees (${hsk}), OTA & host fees (${ota})`;
   } else {
-    customInput.style.display = "none";
-    customInput.value = "";
+    document.getElementById('netMemo').value = 'Total Revenue () Management Fee & platform fee (), Housekeeping & Supplies Fees (), OTA & host fees ()';
   }
 }
 
-function removeRow(btn){
-  btn.closest("tr").remove();
-  generateOutput();
+
+function updateStatementAmount(){
+  const expenses = Math.abs(parseMoney(document.getElementById('expensesTotal').value)||0);
+  const netRevenue = Math.abs(parseMoney(document.getElementById('netRevenue').value)||0);
+  document.getElementById('statementAmount').value = money(expenses - netRevenue);
 }
 
-function getRows(){
-  return [...document.querySelectorAll("#lines tr")].map(row => {
-    const glSelect = row.querySelector(".gl").value.trim();
-    const customGL = row.querySelector(".customGL").value.trim();
-
-    return {
-      gl: glSelect === "__CUSTOM__" ? customGL : glSelect,
-      memo: row.querySelector(".memo").value.trim(),
-      amount: parseFloat(row.querySelector(".amount").value) || 0
-    };
-  }).filter(r => r.gl || r.memo || r.amount !== 0);
-}
-
-function saveCustomGLs(){
-  const currentSaved = getSavedGLs();
-  const newGLs = getRows()
-    .map(r => r.gl)
-    .filter(gl => gl && !BASE_GL_LIST.includes(gl) && !currentSaved.includes(gl));
-
-  const updated = [...new Set([...currentSaved, ...newGLs])];
-  localStorage.setItem("ownerStatementCustomGLs", JSON.stringify(updated));
-
-  alert("Custom GLs saved. They will show in the dropdown next time.");
-}
-
-function money(num){
-  return Math.abs(num).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
-function formatAmount(num){
-  return num.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
-function formatCurrency(num){
-  return num.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD"
-  });
-}
-
-function generateOutput(){
-  updateBillDescription();
-
-  const rows = getRows();
-  const outputBody = document.getElementById("outputBody");
-  outputBody.innerHTML = "";
-
-  let outputRows = [];
-
-  const specialRows = rows.filter(r => SPECIAL_GROUPS.includes(r.gl));
-  const normalRows = rows.filter(r => !SPECIAL_GROUPS.includes(r.gl));
-
-  const totalEntered = rows.reduce((sum, r) => sum + r.amount, 0);
-  document.getElementById("totalBox").innerText = `Total Entered: ${formatCurrency(totalEntered)}`;
-
-  const manualExpenses = parseFloat(document.getElementById("manualExpenses").value) || 0;
-  const manualNetRevenue = parseFloat(document.getElementById("manualNetRevenue").value) || 0;
-  const expectedStatementAmount = manualExpenses - manualNetRevenue;
-
-  if(specialRows.length){
-    const memo = SPECIAL_GROUPS.map(gl => {
-      const found = specialRows.find(r => r.gl === gl);
-      return found ? `${gl} (${money(found.amount)})` : null;
-    }).filter(Boolean).join(", ");
-
-    const specialNetRevenue = specialRows.reduce((sum, r) => sum + r.amount, 0);
-    const airbaseAmount = specialNetRevenue * -1;
-
-    outputRows.push({
-      memo: memo,
-      amount: airbaseAmount
-    });
+function extractRows(text){
+  rawLines = [];
+  const lines = text.split('\n').map(clean).filter(Boolean);
+  const moneyEnd = /(-?\$?[\d,]+\.\d{2})$/;
+  const datePat = /(\d{2}\s+[A-Za-z]{3}\s+\d{2})/;
+  for (let i=0; i<lines.length; i++) {
+    const line = lines[i];
+    if (!moneyEnd.test(line) || !datePat.test(line)) continue;
+    if (/Net Owner Revenue|Balance|Payouts|ADR|Nights|Rental Revenue/i.test(line)) continue;
+    const amountStr = line.match(moneyEnd)[1];
+    const amount = parseMoney(amountStr);
+    if (!amount) continue;
+    const date = (line.match(datePat)||[])[1] || '';
+    const beforeDate = clean(line.split(date)[0]);
+    const afterDate = clean(line.split(date).slice(1).join(date).replace(moneyEnd,''));
+    const cat = afterDate || '';
+    if (!cat || !/\d{4}/.test(cat)) continue;
+    rawLines.push({use:true, description:beforeDate, date, category:cat, amount, memo:categoryToMemo(cat, beforeDate)});
   }
+}
 
-  const grouped = {};
+function categoryToMemo(cat, desc){
+  const c = cat.toLowerCase();
+  if (c.includes('rent expense')) return 'Rent & Lease Expense';
+  if (c.includes('cam expense')) return 'Common Area Maintenance';
+  if (c.includes('facilities management')) return 'Facilities Management Program Charge';
+  if (c.includes('utilities - electric')) return 'Utilities - Electric';
+  if (c.includes('utilities - water')) return 'Utilities - Water';
+  if (c.includes('sales & marketing')) {
+    if (/website/i.test(desc)) return 'Website Services';
+    if (/brand/i.test(desc)) return 'Monthly Brand Design Services';
+    if (/social/i.test(desc)) return 'Monthly Social Media Services';
+    return 'Sales & Marketing Services';
+  }
+  if (c.includes('reactive labor')) return 'Reactive Labor - Maintenance';
+  if (c.includes('reactive supplies')) return 'Reactive Supplies';
+  if (c.includes('outside services')) return desc || 'Outside Services';
+  return cat.replace(/^\d{4}\s*-\s*/, '');
+}
 
-  normalRows.forEach(r => {
-    if(!grouped[r.gl]){
-      grouped[r.gl] = {
-        gl: r.gl,
-        memos: [],
-        amount: 0
-      };
-    }
-
-    if(r.memo){
-      grouped[r.gl].memos.push(r.memo);
-    }
-
-    grouped[r.gl].amount += r.amount;
-  });
-
-  Object.values(grouped).forEach(group => {
-    let memoText = group.gl;
-
-    if(group.memos.length){
-      memoText = `${group.gl} : ${group.memos.join(", ")}`;
-    }
-
-    outputRows.push({
-      memo: memoText,
-      amount: group.amount
-    });
-  });
-
-  outputRows.forEach((row, index) => {
-    const tr = document.createElement("tr");
+function renderRaw(){
+  const tbody = document.querySelector('#rawTable tbody');
+  tbody.innerHTML = '';
+  rawLines.forEach((r, idx)=>{
+    const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${row.memo}</td>
-      <td>${formatAmount(row.amount)}</td>
-    `;
-    outputBody.appendChild(tr);
+      <td><input type="checkbox" ${r.use?'checked':''} onchange="rawLines[${idx}].use=this.checked; groupRows();"></td>
+      <td><input value="${escapeHtml(r.description)}" onchange="rawLines[${idx}].description=this.value; groupRows();"></td>
+      <td><input value="${escapeHtml(r.date)}" onchange="rawLines[${idx}].date=this.value; groupRows();"></td>
+      <td><input value="${escapeHtml(r.category)}" onchange="rawLines[${idx}].category=this.value; groupRows();"></td>
+      <td><input class="money" value="${money(r.amount)}" onchange="rawLines[${idx}].amount=parseMoney(this.value); groupRows();"></td>
+      <td><input value="${escapeHtml(r.memo)}" onchange="rawLines[${idx}].memo=this.value; groupRows();"></td>`;
+    tbody.appendChild(tr);
   });
+}
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-  const backedInStatementAmount = outputRows.reduce((sum, r) => sum + r.amount, 0);
+function groupRows(){
+  grouped = [];
+  const net = parseMoney(document.getElementById('netRevenue').value);
+  if (!isNaN(net) && net !== 0) grouped.push({category:fixedValue('defaultCategory'), amount:-Math.abs(net), memo:document.getElementById('netMemo').value});
 
-  const totalRow = document.createElement("tr");
-  totalRow.innerHTML = `
-    <td></td>
-    <td><strong>Grand Total</strong></td>
-    <td><strong>${formatAmount(backedInStatementAmount)}</strong></td>
-  `;
-  outputBody.appendChild(totalRow);
+  const map = new Map();
+  for (const r of rawLines.filter(x=>x.use)) {
+    const catLower = (r.category || '').toLowerCase();
+    const isReactiveSupplies = catLower.includes('reactive supplies');
+    const isReactiveLabor = catLower.includes('reactive labor');
+    let memo = r.memo;
+    if (isReactiveLabor) memo = reactiveLaborMemo();
+    if (isReactiveSupplies) memo = 'Reactive Supplies';
 
-  const difference = backedInStatementAmount - expectedStatementAmount;
-
-  document.getElementById("totalExpenses").innerText = formatCurrency(manualExpenses);
-  document.getElementById("netRevenue").innerText = formatCurrency(manualNetRevenue);
-  document.getElementById("expectedDisplay").innerText = formatCurrency(expectedStatementAmount);
-  document.getElementById("backedInStatement").innerText = formatCurrency(backedInStatementAmount);
-
-  const differenceCell = document.getElementById("differenceDisplay");
-  differenceCell.innerText = formatCurrency(difference);
-
-  if(Math.abs(difference) < 0.01){
-    differenceCell.className = "good";
-    differenceCell.innerText += " ✅";
-  } else {
-    differenceCell.className = "bad";
-    differenceCell.innerText += " ❌";
+    const key = r.category + '||' + memo;
+    if (!map.has(key)) map.set(key, {sourceCategory:r.category, category:fixedValue('defaultCategory'), amount:0, memo, descriptions:[]});
+    const g = map.get(key);
+    g.amount += airbaseExpenseAmount(r.amount);
+    if (isReactiveSupplies) g.descriptions.push(r.description);
   }
+
+  for (const g of map.values()) {
+    if ((g.memo || '').toLowerCase() === 'reactive supplies') {
+      g.memo = 'Reactive Supplies: ' + reactiveSupplyItems(g.descriptions).join(', ');
+    }
+    delete g.descriptions;
+    grouped.push(g);
+  }
+  renderGrouped();
 }
 
-function copyTable(){
-  let text = "Line\tAirbase Memo\tSUM of Invoice S/B\n";
+function reactiveLaborMemo(){
+  const m = document.getElementById('month').value || 'Month';
+  const y = document.getElementById('year').value || '2026';
+  return `${m} ${y} - Reactive Labor - Maintenance`;
+}
 
-  [...document.querySelectorAll("#outputBody tr")].forEach(row => {
-    const cells = [...row.querySelectorAll("td")].map(td => td.innerText);
-    text += cells.join("\t") + "\n";
+function reactiveSupplyItems(descriptions){
+  const seen = new Set();
+  const items = [];
+  const add = value => {
+    value = clean(value).toLowerCase();
+    value = value.replace(/^inv\s*\d+\s*-\s*/i,'');
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    items.push(value);
+  };
+  descriptions.forEach(d => String(d||'').split(',').forEach(add));
+  if (seen.has('paint supplies') && seen.has('paint')) {
+    return items.filter(x => x !== 'paint');
+  }
+  return items;
+}
+
+function renderGrouped(){
+  const tbody = document.querySelector('#airbaseTable tbody');
+  tbody.innerHTML = '';
+  let total = 0;
+  grouped.forEach(g=>{
+    total += Number(g.amount)||0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="money">${money(g.amount)}</td><td>${escapeHtml(g.memo)}</td>`;
+    tbody.appendChild(tr);
   });
-
-  navigator.clipboard.writeText(text);
-  alert("Pivot table copied!");
+  const expenseRowsTotal = rawLines.filter(r=>r.use).reduce((s,r)=>s+airbaseExpenseAmount(r.amount),0);
+  const net = Math.abs(parseMoney(document.getElementById('netRevenue').value)||0);
+  const statementAmount = parseMoney(document.getElementById('statementAmount').value)||0;
+  const diff = total - statementAmount;
+  document.getElementById('groupCheck').innerHTML = `<span class="pill">Net revenue line: ${money(-net)}</span><span class="pill">Expense lines: ${money(expenseRowsTotal)}</span><span class="pill">Statement amount: ${money(statementAmount)}</span><span class="pill">Airbase total: ${money(total)}</span><span class="pill ${Math.abs(diff)<0.01?'ok':'warn'}">Difference: ${money(diff)}</span>`;
+  document.getElementById('summaryCheck').innerHTML = `Found <b>${rawLines.length}</b> expense rows. Verify rows because PDF extraction can miss wrapped text.`;
 }
 
-addRow("Total Revenue", "", 23117.09);
-addRow("Management Fee & platform fee", "", -4161.08);
-addRow("Housekeeping & Supplies Fees", "", -1804.90);
-addRow("OTA & host fees", "", -2908.17);
+function addManualRow(){ rawLines.push({use:true, description:'', date:'', category:'', amount:0, memo:''}); renderRaw(); groupRows(); }
+function clearAll(){ rawLines=[]; grouped=[]; fullText=''; document.querySelector('#rawTable tbody').innerHTML=''; document.querySelector('#airbaseTable tbody').innerHTML=''; document.getElementById('pdfText').textContent=''; statusEl.textContent='Cleared.'; }
+function toggleText(){ const el=document.getElementById('pdfText'); el.style.display = el.style.display==='none' ? 'block':'none'; }
 
-addRow("Rent & Lease Expense", "", 15049.00);
-addRow("Facilities Management Program Charge", "", 165.00);
-addRow("Common Area Maintenance", "", 16548.88);
-addRow("Common Area Maintenance", "", 137.14);
-addRow("Utilities - Electric", "", 471.65);
-addRow("Monthly Brand Design Services", "", 500.00);
-addRow("Website Services", "", 500.00);
-addRow("Monthly Social Media Services", "", 500.00);
-addRow("Utilities - Water", "", 217.98);
-addRow("Reactive Labor - Maintenance", "Maintenance labor", 212.50);
-addRow("CAPEX", "hosing, clamps, ties (new dishwasher installment)", 373.03);
-
-generateOutput();
+function airbaseRows(){
+  const dept = fixedValue('department');
+  const cls = fixedValue('unitClass');
+  return grouped.map(g => [g.category, money(g.amount), dept, cls, g.memo]);
+}
+function amountDescriptionRows(){
+  return grouped.map(g => [money(g.amount), g.memo]);
+}
+async function copyAmountDescription(){
+  const tsv = amountDescriptionRows().map(r=>r.join('\t')).join('\n');
+  await navigator.clipboard.writeText(tsv);
+  statusEl.textContent = 'Copied amount + description rows to clipboard.';
+}
+async function copyAirbaseTSV(){
+  const tsv = airbaseRows().map(r=>r.join('\t')).join('\n');
+  await navigator.clipboard.writeText(tsv);
+  statusEl.textContent = 'Copied full rows to clipboard.';
+}
+function downloadCSV(){
+  const rows = [['Amount','Memo Description'], ...amountDescriptionRows()];
+  const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'airbase_owner_statement_rows.csv';
+  a.click();
+}
 </script>
 </body>
 </html>
