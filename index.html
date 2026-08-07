@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>430 Fleming → Airbase Processor</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root { --blue:#007acc; --bg:#f4f7fa; --line:#d8dde3; --text:#1f2933; --navy:#0d3b66; --green:#eaf7ef; --yellow:#fff8e6; --purple:#f3edff; --teal:#e8f7fb; --orange:#fff1e8; }
     * { box-sizing: border-box; }
@@ -67,7 +66,7 @@
 <div class="container">
   <div class="topbar">
     <h1>430 Fleming → Airbase Processor</h1>
-    <p class="sub">Drop the owner statement PDF, then review the Airbase information and memo rows.</p>
+    <p class="sub">Drop the owner statement PDF, then review the Airbase information and memo rows. <b>PDF reader + OCR fallback v4</b></p>
   </div>
   <div class="content">
 
@@ -150,7 +149,99 @@
 </div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfJsReadyPromise = null;
+let tesseractReadyPromise = null;
+let usedOCR = false;
+
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    const el=document.createElement('script');
+    el.src=src; el.async=true;
+    el.onload=()=>resolve(src);
+    el.onerror=()=>{ el.remove(); reject(new Error('Could not load '+src)); };
+    document.head.appendChild(el);
+  });
+}
+
+
+async function ensureTesseract(){
+  if (window.Tesseract) return window.Tesseract;
+  if (tesseractReadyPromise) return tesseractReadyPromise;
+  tesseractReadyPromise=(async()=>{
+    const sources=[
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js',
+      'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
+    ];
+    let lastErr=null;
+    for(const src of sources){
+      try{
+        await loadScript(src);
+        if(window.Tesseract) return window.Tesseract;
+      }catch(err){ lastErr=err; }
+    }
+    throw lastErr || new Error('OCR library could not be loaded.');
+  })();
+  return tesseractReadyPromise;
+}
+
+function textLooksUsable(text){
+  const t=String(text||'');
+  if(!t.trim()) return false;
+  const mustHave = /(Summary|Net Owner Revenue|Rent Expense|Utilities|Sales\s*&\s*Marketing)/i.test(t);
+  const letters = (t.match(/[A-Za-z]/g)||[]).length;
+  const printable = (t.match(/[\x20-\x7E\n\r\t]/g)||[]).length;
+  const ratio = printable / Math.max(1,t.length);
+  return mustHave && letters > 120 && ratio > 0.78;
+}
+
+async function ocrPdf(pdf){
+  const T = await ensureTesseract();
+  const pageTexts=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    statusEl.textContent = `OCR reading page ${p} of ${pdf.numPages}… this PDF has encoded text.`;
+    const page=await pdf.getPage(p);
+    const viewport=page.getViewport({scale:2.25});
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d', {willReadFrequently:true});
+    canvas.width=Math.ceil(viewport.width);
+    canvas.height=Math.ceil(viewport.height);
+    await page.render({canvasContext:ctx, viewport}).promise;
+    const result=await T.recognize(canvas,'eng',{
+      logger:m=>{
+        if(m && m.status==='recognizing text' && typeof m.progress==='number'){
+          statusEl.textContent=`OCR page ${p} of ${pdf.numPages}: ${Math.round(m.progress*100)}%`;
+        }
+      }
+    });
+    pageTexts.push((result && result.data && result.data.text) ? result.data.text : '');
+  }
+  return pageTexts.join('\n');
+}
+
+async function ensurePdfJs(){
+  if (window.pdfjsLib) return window.pdfjsLib;
+  if (pdfJsReadyPromise) return pdfJsReadyPromise;
+  pdfJsReadyPromise=(async()=>{
+    const sources=[
+      {core:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js', worker:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'},
+      {core:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', worker:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'},
+      {core:'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js', worker:'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'}
+    ];
+    let lastErr=null;
+    for (const src of sources){
+      try{
+        await loadScript(src.core);
+        if (window.pdfjsLib){
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc=src.worker;
+          return window.pdfjsLib;
+        }
+      }catch(err){ lastErr=err; }
+    }
+    throw lastErr || new Error('PDF reader library could not be loaded.');
+  })();
+  return pdfJsReadyPromise;
+}
 
 let rawLines = [];
 let fullText = '';
@@ -160,11 +251,13 @@ const drop = document.getElementById('drop');
 const fileInput = document.getElementById('fileInput');
 const statusEl = document.getElementById('status');
 
+// Bind the drop zone immediately. PDF.js is loaded only when a PDF is chosen,
+// so a blocked CDN can no longer make the whole page appear unresponsive.
 drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+fileInput.addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value=''; });
 document.addEventListener('input', e => { if (['month','year'].includes(e.target.id)) updateBillDescriptionPreview(); });
 
 function money(n){
@@ -230,24 +323,45 @@ function updateBillDescriptionPreview(){
 }
 
 async function handleFile(file){
-  if (!file || file.type !== 'application/pdf') { statusEl.textContent = 'Please choose a PDF.'; return; }
-  statusEl.textContent = 'Reading PDF…';
-  const data = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data}).promise;
-  let pages = [];
-  for (let p=1; p<=pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    const items = content.items.map(i => ({str:i.str, x:i.transform[4], y:i.transform[5]}));
-    pages.push(itemsToLines(items).join('\n'));
+  if (!file) return;
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+  if (!isPdf) { statusEl.textContent = 'Please choose a PDF.'; return; }
+  try {
+    statusEl.textContent = 'Loading PDF reader…';
+    const pdfjs = await ensurePdfJs();
+    statusEl.textContent = 'Reading PDF…';
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({data}).promise;
+    let pages = [];
+    for (let p=1; p<=pdf.numPages; p++) {
+      statusEl.textContent = `Reading page ${p} of ${pdf.numPages}…`;
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const items = content.items.map(i => ({str:i.str, x:i.transform[4], y:i.transform[5]}));
+      pages.push(itemsToLines(items).join('\n'));
+    }
+    fullText = pages.join('\n');
+    usedOCR = false;
+    if (!textLooksUsable(fullText)) {
+      statusEl.textContent = 'This PDF uses encoded text. Switching to OCR…';
+      fullText = await ocrPdf(pdf);
+      usedOCR = true;
+    }
+    document.getElementById('pdfText').textContent = fullText;
+    extractInfo(fullText);
+    extractRows(fullText, usedOCR);
+    renderRaw();
+    groupRows();
+    if (!document.getElementById('month').value || rawLines.length === 0) {
+      throw new Error('The PDF was read, but the statement fields could not be identified. Open Detailed Extracted Information to review the text.');
+    }
+    statusEl.textContent = usedOCR
+      ? `Loaded ${file.name} using OCR. Review the Airbase information below.`
+      : `Loaded ${file.name}. Review the Airbase information below.`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Could not read the PDF. ' + (err && err.message ? err.message : 'Unknown error');
   }
-  fullText = pages.join('\n');
-  document.getElementById('pdfText').textContent = fullText;
-  extractInfo(fullText);
-  extractRows(fullText);
-  renderRaw();
-  groupRows();
-  statusEl.textContent = `Loaded ${file.name}. Review the rows below.`;
 }
 
 function itemsToLines(items){
@@ -284,15 +398,17 @@ function extractInfo(text){
 }
 
 function buildNetMemo(text){
+  let rental='', mgmt='', hsk='', ota='';
   const m = text.match(/Net Owner Revenue[\s\S]*?\$?([\d,]+\.\d{2})\s+\d+\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+-\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})/i);
   if (m) {
-    const rental = m[2], mgmt = m[6], hsk = m[7], ota = m[8];
-    document.getElementById('netMemo').value = `Total Revenue (${rental}) Management Fee & platform fee (${mgmt}), Housekeeping & Supplies Fees (${hsk}), OTA & host fees (${ota})`;
+    rental=m[2]; mgmt=m[6]; hsk=m[7]; ota=m[8];
   } else {
-    document.getElementById('netMemo').value = 'Total Revenue () Management Fee & platform fee (), Housekeeping & Supplies Fees (), OTA & host fees ()';
+    const region=(text.match(/Net Owner Revenue([\s\S]*?)(General\s*&\s*Administrative|General Administrative)/i)||[])[1] || '';
+    const vals=(region.match(/-?\$[\d,]+\.\d{2}/g)||[]).slice(0,9).map(v=>v.replace(/[-$]/g,''));
+    if(vals.length>=9){ rental=vals[1]; mgmt=vals[5]; hsk=vals[6]; ota=vals[7]; }
   }
+  document.getElementById('netMemo').value = `Total Revenue (${rental}) Management Fee & platform fee (${mgmt}), Housekeeping & Supplies Fees (${hsk}), OTA & host fees (${ota})`;
 }
-
 
 function updateStatementAmount(){
   const expenses = Math.abs(parseMoney(document.getElementById('expensesTotal').value)||0);
@@ -300,7 +416,7 @@ function updateStatementAmount(){
   document.getElementById('statementAmount').value = money(expenses - netRevenue);
 }
 
-function extractRows(text){
+function extractRows(text, fromOCR=false){
   rawLines = [];
   const lines = text.split('\n').map(clean).filter(Boolean);
   const moneyEnd = /(-?\$?[\d,]+\.\d{2})$/;
@@ -329,7 +445,7 @@ function extractRows(text){
     if (/Net Owner Revenue|Balance|Payouts|ADR|Nights|Rental Revenue/i.test(line)) continue;
 
     const amountStr = line.match(moneyEnd)[1];
-    const amount = parseMoney(amountStr);
+    let amount = parseMoney(amountStr);
     if (!amount) continue;
 
     const date = (line.match(datePat)||[])[1] || '';
@@ -338,75 +454,39 @@ function extractRows(text){
     const cat = afterDate || '';
     if (!cat || !/\d{4}/.test(cat)) continue;
 
-    const description = findBestDescription(i, beforeDate);
+    let description = findBestDescription(i, beforeDate);
+
+    // OCR sometimes drops a leading minus sign. For statement expense categories,
+    // normalize to negative unless the line is clearly an allocation/credit/refund.
+    if (fromOCR) {
+      const d=(description||'').toLowerCase();
+      const c=(cat||'').toLowerCase();
+      const isCredit = /allocate|credit|refund|reversal/.test(d);
+      const isExpenseCategory = /rent expense|cam expense|sales & marketing|facilities management|reactive supplies|reactive labor|utilities - electric|utilities - water|housekeeping|ff&e|capex|outside services/.test(c);
+      if (isExpenseCategory) amount = isCredit ? Math.abs(amount) : -Math.abs(amount);
+    }
+
+    // Marketing invoice rows wrap across several PDF lines. Use the nearest
+    // recurring service heading above the dated GL row so all three services
+    // remain separate every month.
+    if (/sales\s*&\s*marketing/i.test(cat)) {
+      const candidates = [
+        {re:/monthly\s+brand\s+design\s+services/i, memo:'Monthly Brand Design Services'},
+        {re:/website\s+services/i, memo:'Website Services'},
+        {re:/monthly\s+social\s+media\s+services/i, memo:'Monthly Social Media Services'}
+      ];
+      let best = null;
+      for (let j=i-1; j>=Math.max(0,i-8); j--) {
+        for (const c of candidates) {
+          if (c.re.test(lines[j])) { best = {description:lines[j], memo:c.memo}; break; }
+        }
+        if (best) break;
+      }
+      if (best) description = best.description;
+    }
+
     const memo = categoryToMemo(cat, description);
     rawLines.push({use:true, description, date, category:cat, amount, memo});
-  }
-
-  ensureRequiredAirbaseRows(text);
-}
-
-function hasRowMemo(memo){
-  return rawLines.some(r => String(r.memo || '').toLowerCase() === String(memo || '').toLowerCase());
-}
-
-function addExtractedRow(description, date, category, amount, memo){
-  if (hasRowMemo(memo)) return;
-  rawLines.push({use:true, description, date: date || '', category, amount, memo});
-}
-
-function findAmountAfter(text, phraseRegex, categoryRegex){
-  const re = new RegExp(phraseRegex + '[\s\S]{0,500}?(\d{2}\s+[A-Za-z]{3}\s+\d{2})[\s\S]{0,260}?(' + categoryRegex + ')[\s\S]{0,180}?(-?\$?[\d,]+\.\d{2})', 'i');
-  const m = text.match(re);
-  if (!m) return null;
-  return {date:m[1], category:clean(m[2]), amount:parseMoney(m[3])};
-}
-
-function sumCategory(text, categoryRegex){
-  const re = new RegExp('(\d{2}\s+[A-Za-z]{3}\s+\d{2})[\s\S]{0,120}?(' + categoryRegex + ')[\s\S]{0,120}?(-?\$?[\d,]+\.\d{2})', 'gi');
-  let m, total = 0, found = false, lastDate = '', lastCat = '';
-  while ((m = re.exec(text)) !== null) {
-    const amt = parseMoney(m[3]);
-    if (!isNaN(amt)) { found = true; total += amt; lastDate = m[1]; lastCat = clean(m[2]); }
-  }
-  return found ? {date:lastDate, category:lastCat, amount:total} : null;
-}
-
-function ensureRequiredAirbaseRows(text){
-  // These rows must never disappear. PDF.js sometimes splits the recurring
-  // marketing description, the invoice wording, and the amount across separate
-  // lines. This fallback searches the full PDF text and adds any missing rows.
-  const marketingCat = '7581 - Outside Services - Sales & Marketing Consulting';
-  const marketingRows = [
-    ['Monthly\s+Brand\s+Design\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Monthly Brand Design Services', 'Monthly Brand Design Services'],
-    ['Website\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Website Services', 'Website Services'],
-    ['Monthly\s+Social\s+Media\s+Services(?:\s*-\s*[A-Za-z]+\s+\d{4})?', 'Monthly Social Media Services', 'Monthly Social Media Services']
-  ];
-  marketingRows.forEach(([phraseRegex, description, memo]) => {
-    if (hasRowMemo(memo)) return;
-    const r = findAmountAfter(text, phraseRegex, '7581\s*-\s*Outside\s+Services\s*-\s*Sales\s*&\s*Marketing\s+Consulting');
-    if (r) addExtractedRow(description, r.date, marketingCat, r.amount, memo);
-  });
-
-  if (!hasRowMemo('Rent & Lease Expense')) {
-    const r = sumCategory(text, '7400\s*-\s*Rent\s+Expense');
-    if (r) addExtractedRow('Rent & Lease Expense', r.date, '7400 - Rent Expense', r.amount, 'Rent & Lease Expense');
-  }
-  if (!hasRowMemo('Common Area Maintenance')) {
-    const r = sumCategory(text, '7402\s*-\s*CAM\s+Expense');
-    if (r) addExtractedRow('Common Area Maintenance', r.date, '7402 - CAM Expense', r.amount, 'Common Area Maintenance');
-  }
-  if (!hasRowMemo('Facilities Management Program Charge')) {
-    const r = findAmountAfter(text, 'Monthly\s+Fee\s+for\s+the\s+Preventative\s+Maintenance\s+Plan', '7800\s*-\s*Facilities\s+Management\s+Program\s+Charge');
-    if (r) addExtractedRow('Monthly Fee for the Preventative Maintenance Plan', r.date, '7800 - Facilities Management Program Charge', r.amount, 'Facilities Management Program Charge');
-  }
-  if (!hasRowMemo('Utilities - Electric')) {
-    const r = sumCategory(text, '7901\s*-\s*Utilities\s*-\s*Electric');
-    if (r) addExtractedRow('Utilities - Electric', r.date, '7901 - Utilities - Electric', r.amount, 'Utilities - Electric');
-  }
-  if (!hasRowMemo('Utilities - Water')) {
-    const r = sumCategory(text, '7902\s*-\s*Utilities\s*-\s*Water');
-    if (r) addExtractedRow('Utilities - Water', r.date, '7902 - Utilities - Water', r.amount, 'Utilities - Water');
   }
 }
 
